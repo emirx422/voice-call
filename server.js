@@ -5,7 +5,6 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 
-// activeUsers objesi artık kullanıcı adını ve ekran paylaşım durumunu tutacak
 const activeUsers = {};
 const userSocketMap = {};
 
@@ -15,7 +14,6 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
-// Kullanıcı listesini tüm istemcilere göndermek için merkezi fonksiyon
 function updateUserList() {
     const userArray = Object.values(activeUsers);
     io.emit('user-list-update', userArray);
@@ -25,7 +23,6 @@ io.on('connection', (socket) => {
     console.log('Bir kullanıcı bağlandı:', socket.id);
 
     socket.on('set-username', (username) => {
-        // Kullanıcı adını ve başlangıç ekran paylaşım durumunu kaydet
         activeUsers[socket.id] = { username, isSharing: false };
         userSocketMap[username] = socket.id;
         console.log(`Kullanıcı adı ayarlandı: ${username} (${socket.id})`);
@@ -62,7 +59,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // EKran paylaşımı olayları
     socket.on('start-screen-share', () => {
         if (activeUsers[socket.id]) {
             activeUsers[socket.id].isSharing = true;
