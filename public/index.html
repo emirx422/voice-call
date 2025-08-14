@@ -211,7 +211,6 @@
             transition: width 0.1s ease-out;
         }
 
-        /* Yeni: Mute/Unmute buton stilleri */
         .mute-user-btn {
             border: none;
             padding: 6px 12px;
@@ -288,9 +287,8 @@
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const callBtn = document.getElementById('callBtn');
         let username = '';
-        let isMicMuted = true; // Başlangıçta ses kapalı
+        let isMicMuted = true;
         
-        // Ses akışı kısıtlamaları (gürültü engelleme açık)
         const audioConstraints = {
             audio: {
                 noiseSuppression: true
@@ -345,6 +343,7 @@
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
             otherUsersList.innerHTML = '';
+            
             const myUsername = username;
             
             users.forEach(user => {
