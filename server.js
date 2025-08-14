@@ -3,12 +3,16 @@ const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 
-app.use(express.static("public"));
+// Sunucunun tüm dosyaları projenin ana dizininden sunmasını sağlar.
+app.use(express.static(__dirname));
 
 let users = []; // Aktif kullanıcı listesi
 
 io.on("connection", (socket) => {
     console.log("Yeni bir kullanıcı bağlandı.");
+
+    // Yeni bağlanan kullanıcıya mevcut kullanıcı listesini gönderir
+    socket.emit('user-list-update', users);
 
     // Kullanıcı adı alındığında listeye ekle ve herkese duyur
     socket.on('set-username', (username) => {
@@ -16,7 +20,7 @@ io.on("connection", (socket) => {
         if (!users.includes(username)) {
             users.push(username);
         }
-        io.emit('user-list-update', users); // Herkese yeni listeyi gönder
+        io.emit('user-list-update', users);
         console.log("Kullanıcı listesi güncellendi:", users);
     });
 
@@ -25,12 +29,12 @@ io.on("connection", (socket) => {
         console.log("Bir kullanıcı ayrıldı.");
         if (socket.username) {
             users = users.filter(user => user !== socket.username);
-            io.emit('user-list-update', users); // Herkese güncel listeyi gönder
+            io.emit('user-list-update', users);
             console.log("Kullanıcı listesi güncellendi:", users);
         }
     });
-  
-    // Mevcut sesli arama ve mesajlaşma kodları
+    
+    // Sesli arama ve mesajlaşma sinyal kodları
     socket.on("offer", (data) => socket.broadcast.emit("offer", data));
     socket.on("answer", (data) => socket.broadcast.emit("answer", data));
     socket.on("ice-candidate", (data) => socket.broadcast.emit("ice-candidate", data));
