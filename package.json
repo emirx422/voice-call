@@ -1,18 +1,11 @@
 {
-  "name": "fisbord-voice-chat",
+  "name": "fisbord-sesli-sohbet",
   "version": "1.0.0",
-  "description": "A simple voice and text chat application using WebRTC and Socket.IO.",
+  "description": "Basit bir sesli ve metin sohbet uygulaması.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [
-    "webrtc",
-    "socket.io",
-    "voice chat"
-  ],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
