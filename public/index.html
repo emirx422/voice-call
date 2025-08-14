@@ -4,13 +4,14 @@
     <title>Fisbord</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         :root {
             --bg-color: #2c2f33;
             --panel-bg: #23272a;
             --main-text-color: #f6f6f7;
             --secondary-text-color: #b9bbbe;
-            --accent-color: #7289da; /* Discord mavisi */
+            --accent-color: #7289da;
             --danger-color: #f04747;
             --success-color: #43b581;
             --border-color: #40444b;
@@ -305,7 +306,7 @@
                     <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
                     <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
                 </div>
-                <button id="callBtn" class="action-btn">Sesli Aramaya Katıl</button>
+                <button id="callBtn" class="action-btn" style="display: none;">Sesli Aramaya Katıl</button>
             </div>
         </div>
 
@@ -390,6 +391,7 @@
                 username = savedUsername;
                 socket.emit('set-username',username);
                 document.getElementById('auth-card').style.display='none';
+                document.getElementById('callBtn').style.display='block';
             }
         };
 
