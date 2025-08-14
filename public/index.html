@@ -64,14 +64,6 @@
             border: 1px solid #ccc;
         }
         
-        #color-input {
-            width: 40px;
-            height: 40px;
-            border: none;
-            background: none;
-            padding: 0;
-        }
-        
         #callBtn, .action-btn {
             padding: 20px 30px;
             border-radius: 5px;
@@ -109,12 +101,19 @@
 
         .my-controls {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
+            align-items: flex-start;
             margin-bottom: 10px;
             background-color: rgba(0, 0, 0, 0.5);
             padding: 8px;
             border-radius: 5px;
+        }
+
+        .my-controls .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
         }
 
         .my-controls .user-name {
@@ -129,12 +128,19 @@
         
         .other-user-item {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            align-items: flex-start;
             padding: 8px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
             margin-bottom: 8px;
+        }
+        
+        .other-user-item .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
         }
 
         #chat-container {
@@ -215,31 +221,21 @@
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
             margin-bottom: 8px;
-            border: 2px solid transparent;
-            transition: border-color 0.2s ease;
-        }
-
-        .user-item.speaking {
-            box-shadow: 0 0 10px;
-            animation: speaking-glow 1.5s infinite ease-in-out;
-        }
-
-        @keyframes speaking-glow {
-            0% { box-shadow: 0 0 5px; }
-            50% { box-shadow: 0 0 15px; }
-            100% { box-shadow: 0 0 5px; }
         }
         
-        .my-controls.speaking {
-            box-shadow: 0 0 10px;
-            animation: speaking-glow 1.5s infinite ease-in-out;
+        .voice-bar-container {
+            width: 100%;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.2);
+            margin-top: 5px;
+            border-radius: 3px;
         }
         
         .voice-bar {
-            height: 5px;
-            background-color: green;
+            height: 100%;
+            width: 0%;
+            background-color: #5cb85c;
             transition: width 0.1s ease;
-            margin-top: 5px;
             border-radius: 3px;
         }
 
@@ -271,24 +267,26 @@
     <div id="fisbord">Fisbord</div>
 
     <div id="center-container">
-        <h1>Babazırrolar İçin Sesli Sohbet!</h1>
+        <h1>Sesli Arama babazırrolar için!</h1>
         
         <div id="username-container">
             <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
-            <input type="color" id="color-input" value="#ffffff">
             <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
         </div>
 
-        <button id="callBtn" class="action-btn">Sesli Aramaya katılmak için tıkla</button>
+        <button id="callBtn" class="action-btn">Sesli aramak için tıkla</button>
     </div>
 
     <div id="left-panel">
         <div id="voice-control-panel">
-            <h3>Sesli Sohbette Olan Kullanıcılar</h3>
+            <h3>Ses Kontrol Paneli</h3>
             <div class="my-controls" style="display: none;">
-                <span class="user-name" id="my-username"></span>
-                <div style="display: flex; gap: 5px;">
+                <div class="user-info">
+                    <span class="user-name" id="my-username"></span>
                     <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
+                </div>
+                <div class="voice-bar-container">
+                    <div id="my-voice-bar" class="voice-bar"></div>
                 </div>
             </div>
             <ul id="otherUsersList"></ul>
@@ -338,21 +336,19 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const usernameInput = document.getElementById('username-input');
-        const colorInput = document.getElementById('color-input');
         const saveUsernameBtn = document.getElementById('saveUsernameBtn');
         const userList = document.getElementById('userList');
         const otherUsersList = document.getElementById('otherUsersList');
         const usernameContainer = document.getElementById('username-container');
         const myControlsDiv = document.querySelector('.my-controls');
         const myUsernameSpan = document.getElementById('my-username');
+        const myVoiceBar = document.getElementById('my-voice-bar');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const callBtn = document.getElementById('callBtn');
         
         let username = '';
-        let myColor = '#ffffff';
         let isMicMuted = true;
         const iceCandidateQueues = {}; 
-        const userColors = {};
         
         const audioConstraints = {
             audio: {
@@ -366,12 +362,9 @@
 
         window.onload = () => {
             const savedUsername = localStorage.getItem('username');
-            const savedColor = localStorage.getItem('color');
             if (savedUsername) {
                 username = savedUsername;
-                myColor = savedColor || '#ffffff';
-                colorInput.value = myColor;
-                socket.emit('set-username', { username, color: myColor });
+                socket.emit('set-username', username);
                 usernameContainer.style.display = 'none';
             }
         };
@@ -388,10 +381,8 @@
                 return;
             }
             username = enteredUsername;
-            myColor = colorInput.value;
             localStorage.setItem('username', username);
-            localStorage.setItem('color', myColor);
-            socket.emit('set-username', { username, color: myColor });
+            socket.emit('set-username', username);
             alert('Kullanıcı adınız kaydedildi: ' + username);
             usernameContainer.style.display = 'none';
         };
@@ -410,7 +401,7 @@
             if (data.isSystem) {
                 messageElement.innerHTML = `<span class="message-timestamp">[${data.timestamp}]</span> <span class="system-message">${data.text}</span>`;
             } else {
-                messageElement.innerHTML = `<span class="message-timestamp">[${data.timestamp}]</span> <strong class="message-username" style="color: ${data.color};">${data.username}:</strong> ${data.text}`;
+                messageElement.innerHTML = `<span class="message-timestamp">[${data.timestamp}]</span> <strong class="message-username">${data.username}:</strong> ${data.text}`;
             }
             messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -423,10 +414,15 @@
             const createListItem = (user) => {
                 const li = document.createElement('li');
                 li.className = 'user-item';
-                li.innerText = user.username;
+                li.innerHTML = `
+                    <div class="user-info">
+                        <span class="user-name">${user.username}</span>
+                    </div>
+                    <div class="voice-bar-container">
+                        <div class="voice-bar"></div>
+                    </div>
+                `;
                 li.setAttribute('data-username', user.username);
-                li.setAttribute('data-color', user.color);
-                userColors[user.username] = user.color;
                 return li;
             };
 
@@ -436,11 +432,11 @@
 
                 if (user.username !== username) {
                     const liOther = createListItem(user);
+                    liOther.className = 'other-user-item';
                     otherUsersList.appendChild(liOther);
                 } else {
-                    myControlsDiv.style.display = 'flex';
                     myUsernameSpan.innerText = user.username;
-                    myUsernameSpan.style.color = user.color;
+                    myControlsDiv.style.display = 'flex';
                 }
             });
         });
@@ -448,15 +444,9 @@
         socket.on('user-voice-activity', data => {
             const userElement = document.querySelector(`#otherUsersList li[data-username="${data.username}"]`);
             if (userElement) {
-                const color = userElement.getAttribute('data-color');
-                if (data.isSpeaking) {
-                    userElement.classList.add('speaking');
-                    userElement.style.borderColor = color;
-                    userElement.style.boxShadow = `0 0 10px ${color}`;
-                } else {
-                    userElement.classList.remove('speaking');
-                    userElement.style.borderColor = 'transparent';
-                    userElement.style.boxShadow = 'none';
+                const voiceBar = userElement.querySelector('.voice-bar');
+                if (voiceBar) {
+                    voiceBar.style.width = `${data.volume}%`;
                 }
             }
         });
@@ -470,10 +460,7 @@
 
                 if (isMicMuted) {
                     clearInterval(voiceInterval);
-                    socket.emit('voice-activity', false);
-                    myControlsDiv.classList.remove('speaking');
-                    myControlsDiv.style.borderColor = 'transparent';
-                    myControlsDiv.style.boxShadow = 'none';
+                    myVoiceBar.style.width = '0%';
                 } else {
                     startVoiceDetection();
                 }
@@ -490,8 +477,6 @@
             }
 
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            let isSpeaking = false;
-            let lastSpeaking = false;
 
             voiceInterval = setInterval(() => {
                 analyser.getByteFrequencyData(dataArray);
@@ -500,21 +485,10 @@
                     sum += dataArray[i];
                 }
                 const average = sum / dataArray.length;
-                isSpeaking = average > speakingThreshold;
+                const volume = Math.min(100, Math.floor(average / 1.5));
 
-                if (isSpeaking !== lastSpeaking) {
-                    socket.emit('voice-activity', isSpeaking);
-                    if (isSpeaking) {
-                        myControlsDiv.classList.add('speaking');
-                        myControlsDiv.style.borderColor = myColor;
-                        myControlsDiv.style.boxShadow = `0 0 10px ${myColor}`;
-                    } else {
-                        myControlsDiv.classList.remove('speaking');
-                        myControlsDiv.style.borderColor = 'transparent';
-                        myControlsDiv.style.boxShadow = 'none';
-                    }
-                    lastSpeaking = isSpeaking;
-                }
+                myVoiceBar.style.width = `${volume}%`;
+                socket.emit('voice-activity', volume);
             }, 100);
         }
         
@@ -530,7 +504,6 @@
                 toggleMicBtn.innerText = 'Sesi Aç';
                 toggleMicBtn.classList.remove('active');
 
-                myControlsDiv.style.display = 'flex';
                 callBtn.style.display = 'none';
                 
                 socket.emit('call', { caller: username });
