@@ -1,78 +1,66 @@
 const express = require('express');
-const http = require('http');
-const path = require('path');
-const { Server } = require('socket.io');
-
 const app = express();
+const http = require('http');
 const server = http.createServer(app);
+const { Server } = require('socket.io');
 const io = new Server(server);
 
-const users = {}; // Bağlı kullanıcıları ve kullanıcı adlarını saklamak için basit bir nesne
+const activeUsers = {};
+const userSocketMap = {};
 
-// Kök dizinden statik dosyaları sunar
-app.use(express.static(path.join(__dirname)));
+app.use(express.static('public'));
+
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/index.html');
+});
 
 io.on('connection', (socket) => {
     console.log('Bir kullanıcı bağlandı:', socket.id);
 
-    // Kullanıcı adı belirleme
     socket.on('set-username', (username) => {
-        if (!username || users[socket.id]) {
-            return;
-        }
-        users[socket.id] = { username, id: socket.id };
-        console.log(`Kullanıcı ${socket.id} kullanıcı adını ${username} olarak belirledi`);
-        // Güncellenmiş kullanıcı listesini tüm istemcilere gönder
-        io.emit('user-list-update', Object.values(users));
+        activeUsers[socket.id] = username;
+        userSocketMap[username] = socket.id;
+        console.log(`Kullanıcı adı ayarlandı: ${username} (${socket.id})`);
+        io.emit('user-list-update', Object.values(activeUsers));
     });
 
-    // Metin mesajlarını yönet
     socket.on('message', (data) => {
+        console.log(`Yeni mesaj: ${data.username}: ${data.text}`);
         io.emit('message', data);
     });
 
-    // WebRTC arama başlatma
-    socket.on('call', (data) => {
-        const otherUser = Object.values(users).find(user => user.username === data.caller);
-        if (otherUser) {
-            io.to(otherUser.id).emit('call', { caller: users[socket.id].username });
-        }
+    socket.on('call', ({ caller }) => {
+        io.emit('call', { caller });
     });
-
-    // WebRTC teklifini yönet (offer)
+    
     socket.on('offer', (data) => {
-        const targetUser = Object.values(users).find(user => user.username === data.to);
-        if (targetUser) {
-            io.to(targetUser.id).emit('offer', { from: users[socket.id].username, to: data.to, offer: data.offer });
+        const targetSocketId = userSocketMap[data.to];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('offer', { from: activeUsers[socket.id], to: data.to, offer: data.offer });
         }
     });
 
-    // WebRTC cevabını yönet (answer)
     socket.on('answer', (data) => {
-        const targetUser = Object.values(users).find(user => user.username === data.to);
-        if (targetUser) {
-            io.to(targetUser.id).emit('answer', { from: users[socket.id].username, to: data.to, answer: data.answer });
+        const targetSocketId = userSocketMap[data.to];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('answer', { from: activeUsers[socket.id], to: data.to, answer: data.answer });
         }
     });
 
-    // WebRTC ICE adaylarını yönet
     socket.on('ice-candidate', (data) => {
-        const targetUser = Object.values(users).find(user => user.username === data.to);
-        if (targetUser) {
-            io.to(targetUser.id).emit('ice-candidate', { from: users[socket.id].username, to: data.to, candidate: data.candidate });
+        const targetSocketId = userSocketMap[data.to];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('ice-candidate', { from: activeUsers[socket.id], to: data.to, candidate: data.candidate });
         }
     });
 
-    // Kullanıcı bağlantı kesilmesini yönet
     socket.on('disconnect', () => {
-        console.log('Bir kullanıcı bağlantısı kesildi:', socket.id);
-        const disconnectedUser = users[socket.id];
-        if (disconnectedUser) {
-            delete users[socket.id];
-            io.emit('disconnect-user', disconnectedUser.username);
-            // Güncellenmiş kullanıcı listesini tüm istemcilere gönder
-            io.emit('user-list-update', Object.values(users));
-        }
+        const disconnectedUser = activeUsers[socket.id];
+        delete activeUsers[socket.id];
+        delete userSocketMap[disconnectedUser];
+        console.log('Bir kullanıcı ayrıldı:', socket.id);
+        io.emit('user-list-update', Object.values(activeUsers));
+        io.emit('disconnect-user', disconnectedUser);
     });
 });
 
