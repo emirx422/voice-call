@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Fisbord</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <style>
         body {
             background-image: url("https://raw.githubusercontent.com/emirx422/voice-call/main/public/windows_xp_original-wallpaper-1920x1080.jpg");
@@ -11,43 +12,72 @@
             background-position: center;
             color: white;
             font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            min-height: 100vh;
             margin: 0;
-            padding-bottom: 50px;
+            padding: 0;
             box-sizing: border-box;
         }
+
+        /* Fisbord yazısı */
+        #fisbord {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            font-size: 120px;
+            letter-spacing: 5px;
+            background: linear-gradient(90deg, #8B0000, #FF6347);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            user-select: none;
+            margin: 60px 0 40px 0;
+        }
+
+        /* Ortalanacak öğeler için container */
+        #center-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 160px);
+            margin-top: -15px; /* 15px yukarı kaydır */
+        }
+
         h1 {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #username-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             background-color: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 5px;
             margin-bottom: 20px;
         }
-        button {
-            background-color: white;
-            color: black;
-            padding: 10px 20px;
-            border-radius: 5px;
-            margin: 5px;
-            cursor: pointer;
-        }
-        #username-container {
-            margin-bottom: 15px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+
         #username-input {
             padding: 8px;
             border-radius: 5px;
             border: 1px solid #ccc;
         }
+        
+        #callBtn {
+            padding: 20px 30px;
+            border-radius: 5px;
+            border: none;
+            background-color: #5cb85c;
+            color: white;
+            cursor: pointer;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        /* Mesajlar ve aktif kullanıcı listesi */
         #messages {
             position: fixed;
             left: 10px;
@@ -101,14 +131,18 @@
     </style>
 </head>
 <body>
-    <h1>Sesli Arama babazırrolar için!</h1>
-    
-    <div id="username-container">
-        <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
-        <button id="saveUsernameBtn">Kaydet</button>
-    </div>
+    <div id="fisbord">Fisbord</div>
 
-    <button id="callBtn">Sesli aramak için tıkla</button>
+    <div id="center-container">
+        <h1>Sesli Arama babazırrolar için!</h1>
+        
+        <div id="username-container">
+            <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
+            <button id="saveUsernameBtn">Kaydet</button>
+        </div>
+
+        <button id="callBtn">Sesli aramak için tıkla</button>
+    </div>
 
     <div id="messages"></div>
     <input type="text" id="messageInput" placeholder="Mesaj yaz...">
@@ -133,7 +167,9 @@
         const usernameContainer = document.getElementById('username-container');
         let username = '';
 
-        // Sayfa yüklendiğinde kullanıcı adını kontrol et
+        // --- Yasaklı kullanıcı adları listesi ve kontrol mekanizması ---
+        const forbiddenUsernames = ['yarrak', 'siktir', 'orospu', 'amcık', 'am', 'allah', 'amk', 'sg', 'ananı', 'sikeyim', 'ananısikeyim'];
+
         window.onload = () => {
             const savedUsername = localStorage.getItem('username');
             if (savedUsername) {
@@ -144,15 +180,25 @@
         };
 
         saveUsernameBtn.onclick = () => {
-            if (usernameInput.value) {
-                username = usernameInput.value;
-                localStorage.setItem('username', username);
-                socket.emit('set-username', username);
-                alert('Kullanıcı adınız kaydedildi: ' + username);
-                usernameContainer.style.display = 'none';
-            } else {
+            const enteredUsername = usernameInput.value.trim().toLowerCase();
+
+            if (!enteredUsername) {
                 alert('Lütfen bir kullanıcı adı girin.');
+                return;
             }
+
+            const isForbidden = forbiddenUsernames.some(word => enteredUsername.includes(word));
+
+            if (isForbidden) {
+                alert('Bu kullanıcı adı uygunsuz kelimeler içeriyor. Lütfen başka bir isim seçin.');
+                return;
+            }
+
+            username = enteredUsername;
+            localStorage.setItem('username', username);
+            socket.emit('set-username', username);
+            alert('Kullanıcı adınız kaydedildi: ' + username);
+            usernameContainer.style.display = 'none';
         };
 
         sendButton.onclick = () => {
@@ -171,7 +217,6 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
 
-        // Sunucudan gelen kullanıcı listesini güncelle
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
             users.forEach(user => {
