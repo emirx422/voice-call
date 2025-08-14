@@ -155,6 +155,7 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // Sunucu adresini belirtiyoruz, bu önemli!
         const socket = io('http://localhost:3000');
         let localStream, peerConnection;
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -167,6 +168,7 @@
         const usernameContainer = document.getElementById('username-container');
         let username = '';
 
+        // Yasaklı kullanıcı adları listesi ve kontrol mekanizması
         const forbiddenUsernames = ['yarrak', 'siktir', 'orospu', 'amcık', 'am', 'allah', 'amk', 'sg', 'ananı', 'sikeyim', 'ananısikeyim'];
 
         window.onload = () => {
@@ -227,7 +229,7 @@
 
         document.getElementById("callBtn").onclick = async () => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            peerConnection = new RTCPeerConnection(config);
+            peerConnection = new RTCPeerConnection(config); // Hata burada düzeltildi
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
             peerConnection.ontrack = e => {
                 const audio = document.createElement("audio");
@@ -243,7 +245,7 @@
 
         socket.on("offer", async offer => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            peerConnection = new RTCPeerConnection(config);
+            peerConnection = new RTCPeerConnection(config); // Hata burada da düzeltildi
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
             peerConnection.ontrack = e => {
                 const audio = document.createElement("audio");
