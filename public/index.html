@@ -64,6 +64,14 @@
             border: 1px solid #ccc;
         }
         
+        #color-input {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: none;
+            padding: 0;
+        }
+        
         #callBtn, .action-btn {
             padding: 20px 30px;
             border-radius: 5px;
@@ -119,7 +127,7 @@
             margin: 0;
         }
         
-        #otherUsersList li {
+        .other-user-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -150,6 +158,10 @@
             color: #ccc;
             font-size: 0.8em;
             margin-right: 8px;
+        }
+        
+        .message-username {
+            font-weight: bold;
         }
 
         .message-input-container {
@@ -208,15 +220,27 @@
         }
 
         .user-item.speaking {
-            border-color: #00ff00;
-            box-shadow: 0 0 10px #00ff00;
+            box-shadow: 0 0 10px;
             animation: speaking-glow 1.5s infinite ease-in-out;
         }
 
         @keyframes speaking-glow {
-            0% { box-shadow: 0 0 5px #00ff00; }
-            50% { box-shadow: 0 0 15px #00ff00; }
-            100% { box-shadow: 0 0 5px #00ff00; }
+            0% { box-shadow: 0 0 5px; }
+            50% { box-shadow: 0 0 15px; }
+            100% { box-shadow: 0 0 5px; }
+        }
+        
+        .my-controls.speaking {
+            box-shadow: 0 0 10px;
+            animation: speaking-glow 1.5s infinite ease-in-out;
+        }
+        
+        .voice-bar {
+            height: 5px;
+            background-color: green;
+            transition: width 0.1s ease;
+            margin-top: 5px;
+            border-radius: 3px;
         }
 
         .mute-btn {
@@ -236,26 +260,32 @@
             background-color: #5cb85c; /* Yeşil, Unmuted */
         }
 
+        .system-message {
+            color: #ffc107;
+            font-style: italic;
+        }
+
     </style>
 </head>
 <body>
     <div id="fisbord">Fisbord</div>
 
     <div id="center-container">
-        <h1>Sesli Arama babazırrolar için!</h1>
+        <h1>Babazırrolar İçin Sesli Sohbet!</h1>
         
         <div id="username-container">
             <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
+            <input type="color" id="color-input" value="#ffffff">
             <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
         </div>
 
-        <button id="callBtn" class="action-btn">Sesli aramak için tıkla</button>
+        <button id="callBtn" class="action-btn">Sesli Aramaya katılmak için tıkla</button>
     </div>
 
     <div id="left-panel">
         <div id="voice-control-panel">
-            <h3>Ses Kontrol Paneli</h3>
-            <div class="user-item my-controls" style="display: none;">
+            <h3>Sesli Sohbette Olan Kullanıcılar</h3>
+            <div class="my-controls" style="display: none;">
                 <span class="user-name" id="my-username"></span>
                 <div style="display: flex; gap: 5px;">
                     <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
@@ -308,6 +338,7 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const usernameInput = document.getElementById('username-input');
+        const colorInput = document.getElementById('color-input');
         const saveUsernameBtn = document.getElementById('saveUsernameBtn');
         const userList = document.getElementById('userList');
         const otherUsersList = document.getElementById('otherUsersList');
@@ -316,10 +347,12 @@
         const myUsernameSpan = document.getElementById('my-username');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const callBtn = document.getElementById('callBtn');
-
+        
         let username = '';
+        let myColor = '#ffffff';
         let isMicMuted = true;
         const iceCandidateQueues = {}; 
+        const userColors = {};
         
         const audioConstraints = {
             audio: {
@@ -333,9 +366,12 @@
 
         window.onload = () => {
             const savedUsername = localStorage.getItem('username');
+            const savedColor = localStorage.getItem('color');
             if (savedUsername) {
                 username = savedUsername;
-                socket.emit('set-username', username);
+                myColor = savedColor || '#ffffff';
+                colorInput.value = myColor;
+                socket.emit('set-username', { username, color: myColor });
                 usernameContainer.style.display = 'none';
             }
         };
@@ -352,8 +388,10 @@
                 return;
             }
             username = enteredUsername;
+            myColor = colorInput.value;
             localStorage.setItem('username', username);
-            socket.emit('set-username', username);
+            localStorage.setItem('color', myColor);
+            socket.emit('set-username', { username, color: myColor });
             alert('Kullanıcı adınız kaydedildi: ' + username);
             usernameContainer.style.display = 'none';
         };
@@ -369,7 +407,11 @@
 
         socket.on('message', data => {
             const messageElement = document.createElement('div');
-            messageElement.innerHTML = `<span class="message-timestamp">[${data.timestamp}]</span> <strong>${data.username}:</strong> ${data.text}`;
+            if (data.isSystem) {
+                messageElement.innerHTML = `<span class="message-timestamp">[${data.timestamp}]</span> <span class="system-message">${data.text}</span>`;
+            } else {
+                messageElement.innerHTML = `<span class="message-timestamp">[${data.timestamp}]</span> <strong class="message-username" style="color: ${data.color};">${data.username}:</strong> ${data.text}`;
+            }
             messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
@@ -378,21 +420,27 @@
             userList.innerHTML = '';
             otherUsersList.innerHTML = '';
             
-            const createListItem = (user, isMyUser) => {
+            const createListItem = (user) => {
                 const li = document.createElement('li');
                 li.className = 'user-item';
                 li.innerText = user.username;
                 li.setAttribute('data-username', user.username);
+                li.setAttribute('data-color', user.color);
+                userColors[user.username] = user.color;
                 return li;
             };
 
             users.forEach(user => {
-                const li = createListItem(user, true);
+                const li = createListItem(user);
                 userList.appendChild(li);
 
                 if (user.username !== username) {
-                    const liOther = createListItem(user, false);
+                    const liOther = createListItem(user);
                     otherUsersList.appendChild(liOther);
+                } else {
+                    myControlsDiv.style.display = 'flex';
+                    myUsernameSpan.innerText = user.username;
+                    myUsernameSpan.style.color = user.color;
                 }
             });
         });
@@ -400,10 +448,15 @@
         socket.on('user-voice-activity', data => {
             const userElement = document.querySelector(`#otherUsersList li[data-username="${data.username}"]`);
             if (userElement) {
+                const color = userElement.getAttribute('data-color');
                 if (data.isSpeaking) {
                     userElement.classList.add('speaking');
+                    userElement.style.borderColor = color;
+                    userElement.style.boxShadow = `0 0 10px ${color}`;
                 } else {
                     userElement.classList.remove('speaking');
+                    userElement.style.borderColor = 'transparent';
+                    userElement.style.boxShadow = 'none';
                 }
             }
         });
@@ -418,6 +471,9 @@
                 if (isMicMuted) {
                     clearInterval(voiceInterval);
                     socket.emit('voice-activity', false);
+                    myControlsDiv.classList.remove('speaking');
+                    myControlsDiv.style.borderColor = 'transparent';
+                    myControlsDiv.style.boxShadow = 'none';
                 } else {
                     startVoiceDetection();
                 }
@@ -448,13 +504,14 @@
 
                 if (isSpeaking !== lastSpeaking) {
                     socket.emit('voice-activity', isSpeaking);
-                    const myUserItem = document.querySelector(`.my-controls`);
-                    if (myUserItem) {
-                        if (isSpeaking) {
-                            myUserItem.classList.add('speaking');
-                        } else {
-                            myUserItem.classList.remove('speaking');
-                        }
+                    if (isSpeaking) {
+                        myControlsDiv.classList.add('speaking');
+                        myControlsDiv.style.borderColor = myColor;
+                        myControlsDiv.style.boxShadow = `0 0 10px ${myColor}`;
+                    } else {
+                        myControlsDiv.classList.remove('speaking');
+                        myControlsDiv.style.borderColor = 'transparent';
+                        myControlsDiv.style.boxShadow = 'none';
                     }
                     lastSpeaking = isSpeaking;
                 }
@@ -473,7 +530,6 @@
                 toggleMicBtn.innerText = 'Sesi Aç';
                 toggleMicBtn.classList.remove('active');
 
-                myUsernameSpan.innerText = username;
                 myControlsDiv.style.display = 'flex';
                 callBtn.style.display = 'none';
                 
@@ -592,8 +648,8 @@
             if (iceCandidateQueues[disconnectedUser]) {
                 delete iceCandidateQueues[disconnectedUser];
             }
-            const userItemRight = document.querySelector(`#userList li`);
-            if (userItemRight && userItemRight.innerText === disconnectedUser) {
+            const userItemRight = document.querySelector(`#userList li[data-username="${disconnectedUser}"]`);
+            if (userItemRight) {
                 userItemRight.remove();
             }
             const userItemLeft = document.querySelector(`#otherUsersList li[data-username="${disconnectedUser}"]`);
