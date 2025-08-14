@@ -232,7 +232,6 @@
             font-style: italic;
         }
         
-        /* Ekranın ortasındaki login ekranı */
         #login-container {
             position: absolute;
             top: 50%;
@@ -302,7 +301,7 @@
 
     <div id="main-container" style="display: none;">
         <div id="left-panel">
-            <div id="voice-control-panel">
+            <div id="voice-control-panel" style="display: none;">
                 <h3>Ses Kontrol Paneli</h3>
                 <div class="my-controls">
                     <div class="user-info">
@@ -532,7 +531,7 @@
 
                 loginContainer.style.display = 'none';
                 mainContainer.style.display = 'flex';
-                voiceControlPanel.style.display = 'flex';
+                voiceControlPanel.style.display = 'block'; 
                 
                 socket.emit('call', { caller: username });
             } catch (e) {
