@@ -19,67 +19,21 @@
       margin: 0;
     }
     h1 {
-      background-color: rgba(0, 0, 0, 0.5);
+      background-color: rgba(0, 0, 0, 0.5); /* Arka planı hafif şeffaf yaparak okunabilirliği artırıyoruz */
       padding: 10px;
       border-radius: 5px;
     }
     button {
-      background-color: white;
-      color: black;
+      background-color: white; /* Butonun arka plan rengini beyaz yaptık */
+      color: black; /* Butonun içindeki yazı rengini okunabilmesi için siyah yaptık */
       padding: 10px;
       border-radius: 5px;
-      margin: 5px;
-    }
-    /* Video modalı için yeni CSS kodları */
-    #videoModal {
-      display: none; /* Başlangıçta gizli tutuyoruz */
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.9);
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    #videoModal.show {
-      display: flex;
-    }
-    #videoContainer {
-      position: relative;
-      width: 80%;
-      max-width: 850px;
-      padding-top: 45%;
-    }
-    #videoContainer iframe {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
-    #closeVideoBtn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      font-size: 20px;
-      color: white;
-      cursor: pointer;
     }
   </style>
 </head>
 <body>
   <h1>Sesli Arama babazırrolar için!</h1>
   <button id="callBtn">Sesli aramak için tıkla</button>
-  <button id="videoBtn">Easter egg$</button>
-
-  <div id="videoModal">
-    <div id="videoContainer">
-      <span id="closeVideoBtn">&times;</span>
-      <iframe width="560" height="315" src="https://www.youtube.com/embed/48rz8udZBmQ" frameborder="0" allowfullscreen></iframe>
-    </div>
-  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -122,19 +76,6 @@
 
     socket.on("answer", async answer => await peerConnection.setRemoteDescription(new RTCSessionDescription(answer)));
     socket.on("ice-candidate", async candidate => { try { await peerConnection.addIceCandidate(candidate); } catch(e){console.error(e);} });
-
-    // Video butonu için yeni JavaScript kodları
-    const videoBtn = document.getElementById("videoBtn");
-    const videoModal = document.getElementById("videoModal");
-    const closeVideoBtn = document.getElementById("closeVideoBtn");
-
-    videoBtn.onclick = () => {
-      videoModal.classList.add("show");
-    };
-
-    closeVideoBtn.onclick = () => {
-      videoModal.classList.remove("show");
-    };
   </script>
 </body>
 </html>
