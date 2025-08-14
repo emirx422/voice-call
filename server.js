@@ -2,9 +2,10 @@ const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
+const path = require('path');
 
-// Sunucunun tüm dosyaları projenin ana dizininden sunmasını sağlar.
-app.use(express.static(__dirname));
+// Sunucunun dosyaları "public" klasöründen sunmasını sağlar.
+app.use(express.static(path.join(__dirname, 'public')));
 
 let users = []; // Aktif kullanıcı listesi
 
