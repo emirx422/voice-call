@@ -75,12 +75,6 @@
             transition: background-color 0.2s ease;
         }
 
-        .action-btn {
-            font-size: 16px;
-            padding: 10px 15px;
-            margin: 5px;
-        }
-
         #left-panel {
             position: fixed;
             left: 10px;
@@ -108,6 +102,7 @@
         .my-controls {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             margin-bottom: 10px;
             background-color: rgba(0, 0, 0, 0.5);
             padding: 8px;
@@ -174,44 +169,13 @@
             margin-top: 0;
         }
         
-        #userList, #otherUsersList {
+        #userList {
             list-style-type: none;
             padding: 0;
             margin: 0;
         }
 
-        .user-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            padding: 8px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 5px;
-        }
-
-        .user-name {
-            flex-grow: 1;
-            margin-right: 10px;
-        }
-        
-        .voice-bar-container {
-            width: 60px;
-            height: 10px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 5px;
-            overflow: hidden;
-            margin-right: 10px;
-        }
-
-        .voice-bar {
-            height: 100%;
-            width: 0%;
-            background-color: deepskyblue; /* Mavi renk */
-            transition: width 0.1s ease-out;
-        }
-
-        .mute-user-btn {
+        .mute-btn {
             border: none;
             padding: 6px 12px;
             border-radius: 5px;
@@ -222,7 +186,7 @@
             transition: background-color 0.2s ease;
         }
 
-        .mute-user-btn.active {
+        .mute-btn.active {
             background-color: #5cb85c; /* Yeşil, Unmuted */
         }
     </style>
@@ -246,10 +210,8 @@
             <h3>Ses Kontrol Paneli</h3>
             <div class="user-item my-controls" style="display: none;">
                 <span class="user-name" id="my-username"></span>
-                <div class="voice-bar-container"><div id="my-voice-bar" class="voice-bar"></div></div>
-                <button id="toggle-mic-btn" class="mute-user-btn active">Sesi Kapat</button>
+                <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
             </div>
-            <ul id="otherUsersList"></ul>
         </div>
 
         <div id="chat-container">
@@ -272,7 +234,6 @@
         const socket = io();
         let localStream;
         const peerConnections = {};
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
@@ -280,7 +241,6 @@
         const usernameInput = document.getElementById('username-input');
         const saveUsernameBtn = document.getElementById('saveUsernameBtn');
         const userList = document.getElementById('userList');
-        const otherUsersList = document.getElementById('otherUsersList');
         const usernameContainer = document.getElementById('username-container');
         const myControlsDiv = document.querySelector('.my-controls');
         const myUsernameSpan = document.getElementById('my-username');
@@ -342,38 +302,10 @@
         
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
-            otherUsersList.innerHTML = '';
-            
-            const myUsername = username;
-            
             users.forEach(user => {
                 const li = document.createElement('li');
                 li.innerText = user;
                 userList.appendChild(li);
-
-                if (user !== myUsername) {
-                    const liControl = document.createElement('li');
-                    liControl.className = 'user-item';
-                    liControl.setAttribute('data-username', user);
-                    liControl.innerHTML = `
-                        <span class="user-name">${user}</span>
-                        <div class="voice-bar-container"><div class="voice-bar"></div></div>
-                        <button class="mute-user-btn active">Sesi Kapat</button>
-                    `;
-                    otherUsersList.appendChild(liControl);
-                }
-            });
-
-            document.querySelectorAll('.mute-user-btn').forEach(button => {
-                button.onclick = (e) => {
-                    const targetUsername = e.target.closest('.user-item').getAttribute('data-username');
-                    const remoteAudio = document.querySelector(`audio[data-username="${targetUsername}"]`);
-                    if (remoteAudio) {
-                        remoteAudio.muted = !remoteAudio.muted;
-                        e.target.innerText = remoteAudio.muted ? 'Sesi Aç' : 'Sesi Kapat';
-                        e.target.classList.toggle('active');
-                    }
-                };
             });
         });
         
@@ -386,37 +318,6 @@
             }
         };
         
-        function setupVoiceIndicator(stream, username) {
-            const analyser = audioContext.createAnalyser();
-            const source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
-            analyser.fftSize = 256;
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-
-            const checkVolume = () => {
-                analyser.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for(let i = 0; i < bufferLength; i++) {
-                    sum += dataArray[i];
-                }
-                let average = sum / bufferLength;
-
-                let voiceBar;
-                if (username === localStream.username) {
-                    voiceBar = document.querySelector('#my-voice-bar');
-                } else {
-                    voiceBar = document.querySelector(`.user-item[data-username="${username}"] .voice-bar`);
-                }
-                
-                if (voiceBar) {
-                    voiceBar.style.width = `${Math.min(average * 0.8, 100)}%`;
-                }
-                requestAnimationFrame(checkVolume);
-            };
-            checkVolume();
-        }
-
         callBtn.onclick = async () => {
             if (!username) {
                 alert('Lütfen önce bir kullanıcı adı girin!');
@@ -424,7 +325,6 @@
             }
             try {
                 localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                localStream.username = username;
                 localStream.getAudioTracks().forEach(track => track.enabled = false); // Başlangıçta ses kapalı
                 isMicMuted = true;
                 toggleMicBtn.innerText = 'Sesi Aç';
@@ -433,8 +333,6 @@
                 myUsernameSpan.innerText = username;
                 myControlsDiv.style.display = 'flex';
                 callBtn.style.display = 'none';
-
-                setupVoiceIndicator(localStream, username);
                 
                 socket.emit('call', { caller: username });
             } catch (e) {
@@ -454,10 +352,7 @@
                     const audio = document.createElement("audio");
                     audio.srcObject = e.streams[0];
                     audio.autoplay = true;
-                    audio.setAttribute('data-username', data.caller);
                     document.body.appendChild(audio);
-
-                    setupVoiceIndicator(e.streams[0], data.caller);
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -483,10 +378,7 @@
                     const audio = document.createElement("audio");
                     audio.srcObject = e.streams[0];
                     audio.autoplay = true;
-                    audio.setAttribute('data-username', data.from);
                     document.body.appendChild(audio);
-
-                    setupVoiceIndicator(e.streams[0], data.from);
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -523,10 +415,6 @@
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
-            }
-            const userItemLeft = document.querySelector(`#otherUsersList .user-item[data-username="${disconnectedUser}"]`);
-            if (userItemLeft) {
-                userItemLeft.remove();
             }
             const audioElement = document.querySelector(`audio[data-username="${disconnectedUser}"]`);
             if (audioElement) {
