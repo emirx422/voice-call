@@ -17,7 +17,7 @@
             flex-direction: column;
             min-height: 100vh;
             margin: 0;
-            padding-bottom: 50px; /* Mesaj alanı için boşluk */
+            padding-bottom: 50px;
             box-sizing: border-box;
         }
         h1 {
@@ -33,6 +33,20 @@
             border-radius: 5px;
             margin: 5px;
             cursor: pointer;
+        }
+        #username-container {
+            margin-bottom: 15px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #username-input {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
         }
         #messages {
             position: fixed;
@@ -50,7 +64,7 @@
         #messageInput {
             position: fixed;
             bottom: 10px;
-            left: 320px; /* Mesaj kutusunun sağına hizala */
+            left: 320px;
             width: 200px;
             padding: 8px;
             border-radius: 5px;
@@ -61,7 +75,7 @@
         #sendButton {
             position: fixed;
             bottom: 10px;
-            left: 530px; /* Inputun sağına hizala */
+            left: 530px;
             padding: 8px 15px;
             border-radius: 5px;
             border: none;
@@ -69,15 +83,42 @@
             color: white;
             cursor: pointer;
         }
+        /* Yeni kullanıcı listesi için CSS */
+        #activeUsersList {
+            position: fixed;
+            right: 10px;
+            top: 10px;
+            width: 200px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        #activeUsersList h3 {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
     <h1>Sesli Arama babazırrolar için!</h1>
+    
+    <div id="username-container">
+        <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
+        <button id="saveUsernameBtn">Kaydet</button>
+    </div>
+
     <button id="callBtn">Sesli aramak için tıkla</button>
 
     <div id="messages"></div>
     <input type="text" id="messageInput" placeholder="Mesaj yaz...">
     <button id="sendButton">Gönder</button>
+
+    <div id="activeUsersList">
+        <h3>Aktif Kullanıcılar:</h3>
+        <ul id="userList"></ul>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -87,6 +128,46 @@
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
+        const usernameInput = document.getElementById('username-input');
+        const saveUsernameBtn = document.getElementById('saveUsernameBtn');
+        const userList = document.getElementById('userList');
+        let username = 'anonim'; // Başlangıçta anonim kullanıcı adı
+
+        saveUsernameBtn.onclick = () => {
+            if (usernameInput.value) {
+                username = usernameInput.value;
+                socket.emit('set-username', username); // Kullanıcı adını sunucuya gönder
+                alert('Kullanıcı adınız kaydedildi: ' + username);
+            } else {
+                alert('Lütfen bir kullanıcı adı girin.');
+            }
+        };
+
+        sendButton.onclick = () => {
+            const message = messageInput.value;
+            if (message) {
+                const messageData = { username: username, text: message };
+                socket.emit('message', messageData);
+                messageInput.value = '';
+            }
+        };
+
+        socket.on('message', data => {
+            const messageElement = document.createElement('div');
+            messageElement.innerText = `${data.username}: ${data.text}`;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        // Sunucudan gelen kullanıcı listesini güncelle
+        socket.on('user-list-update', users => {
+            userList.innerHTML = ''; // Listeyi temizle
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.innerText = user;
+                userList.appendChild(li);
+            });
+        });
 
         document.getElementById("callBtn").onclick = async () => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -94,4 +175,35 @@
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
             peerConnection.ontrack = e => {
                 const audio = document.createElement("audio");
-                audio.srcObject = e.streams
+                audio.srcObject = e.streams[0];
+                audio.autoplay = true;
+                document.body.appendChild(audio);
+            };
+            peerConnection.onicecandidate = e => { if(e.candidate) socket.emit("ice-candidate", e.candidate); };
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit("offer", offer);
+        };
+
+        socket.on("offer", async offer => {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            peerConnection = new RTCPeerConnection(config);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            peerConnection.ontrack = e => {
+                const audio = document.createElement("audio");
+                audio.srcObject = e.streams[0];
+                audio.autoplay = true;
+                document.body.appendChild(audio);
+            };
+            peerConnection.onicecandidate = e => { if(e.candidate) socket.emit("ice-candidate", e.candidate); };
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit("answer", answer);
+        });
+
+        socket.on("answer", async answer => await peerConnection.setRemoteDescription(new RTCSessionDescription(answer)));
+        socket.on("ice-candidate", async candidate => { try { await peerConnection.addIceCandidate(candidate); } catch(e){console.error(e);} });
+    </script>
+</body>
+</html>
