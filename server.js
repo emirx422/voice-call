@@ -3,6 +3,7 @@ const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 
+// Bu satırın mevcut olduğundan emin olun
 app.use(express.static("public"));
 
 io.on("connection", (socket) => {
