@@ -118,8 +118,11 @@
             padding: 0;
             margin: 0;
         }
-
+        
         #otherUsersList li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             padding: 8px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
@@ -187,6 +190,28 @@
             padding: 0;
             margin: 0;
         }
+        
+        .user-item {
+            position: relative;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            margin-bottom: 8px;
+            border: 2px solid transparent;
+            transition: border-color 0.2s ease;
+        }
+
+        .user-item.speaking {
+            border-color: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+            animation: speaking-glow 1.5s infinite ease-in-out;
+        }
+
+        @keyframes speaking-glow {
+            0% { box-shadow: 0 0 5px #00ff00; }
+            50% { box-shadow: 0 0 15px #00ff00; }
+            100% { box-shadow: 0 0 5px #00ff00; }
+        }
 
         .mute-btn {
             border: none;
@@ -195,13 +220,16 @@
             cursor: pointer;
             font-size: 14px;
             color: white;
-            background-color: #d9534f; /* Kırmızı, Muted */
             transition: background-color 0.2s ease;
         }
 
+        .mute-btn {
+            background-color: #d9534f; /* Kırmızı, Muted */
+        }
         .mute-btn.active {
             background-color: #5cb85c; /* Yeşil, Unmuted */
         }
+
     </style>
 </head>
 <body>
@@ -223,7 +251,9 @@
             <h3>Ses Kontrol Paneli</h3>
             <div class="user-item my-controls" style="display: none;">
                 <span class="user-name" id="my-username"></span>
-                <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
+                <div style="display: flex; gap: 5px;">
+                    <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
+                </div>
             </div>
             <ul id="otherUsersList"></ul>
         </div>
@@ -242,13 +272,32 @@
         <h3>Aktif Kullanıcılar:</h3>
         <ul id="userList"></ul>
     </div>
-
+    
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let localStream;
         const peerConnections = {};
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const config = {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                {
+                    urls: "turn:openrelay.metered.ca:80",
+                    username: "openrelay",
+                    credential: "openrelay"
+                },
+                {
+                    urls: "turn:openrelay.metered.ca:443",
+                    username: "openrelay",
+                    credential: "openrelay"
+                },
+                {
+                    urls: "turn:openrelay.metered.ca:443?transport=tcp",
+                    username: "openrelay",
+                    credential: "openrelay"
+                },
+            ]
+        };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
@@ -261,8 +310,10 @@
         const myUsernameSpan = document.getElementById('my-username');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const callBtn = document.getElementById('callBtn');
+
         let username = '';
         let isMicMuted = true;
+        const iceCandidateQueues = {}; 
         
         const audioConstraints = {
             audio: {
@@ -271,6 +322,8 @@
         };
 
         const forbiddenUsernames = ['yarrak', 'siktir', 'orospu', 'amcık', 'am', 'allah', 'amk', 'sg', 'ananı', 'sikeyim', 'ananısikeyim'];
+        const speakingThreshold = 10; 
+        let audioContext, analyser, microphone, voiceInterval;
 
         window.onload = () => {
             const savedUsername = localStorage.getItem('username');
@@ -317,30 +370,90 @@
         
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
-            otherUsersList.innerHTML = ''; // Diğer kullanıcılar listesini temizle
+            otherUsersList.innerHTML = '';
+            
+            const createListItem = (user, isMyUser) => {
+                const li = document.createElement('li');
+                li.className = 'user-item';
+                li.innerText = user.username;
+                li.setAttribute('data-username', user.username);
+                return li;
+            };
 
             users.forEach(user => {
-                const li = document.createElement('li');
-                li.innerText = user;
+                const li = createListItem(user, true);
                 userList.appendChild(li);
 
-                // Kendi kullanıcı adımızı diğer kullanıcılar listesine ekleme
-                if (user !== username) {
-                    const liOther = document.createElement('li');
-                    liOther.innerText = user;
+                if (user.username !== username) {
+                    const liOther = createListItem(user, false);
                     otherUsersList.appendChild(liOther);
                 }
             });
         });
         
+        socket.on('user-voice-activity', data => {
+            const userElement = document.querySelector(`#otherUsersList li[data-username="${data.username}"]`);
+            if (userElement) {
+                if (data.isSpeaking) {
+                    userElement.classList.add('speaking');
+                } else {
+                    userElement.classList.remove('speaking');
+                }
+            }
+        });
+
         toggleMicBtn.onclick = () => {
             if (localStream) {
                 isMicMuted = !isMicMuted;
                 localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
                 toggleMicBtn.innerText = isMicMuted ? 'Sesi Aç' : 'Sesi Kapat';
                 toggleMicBtn.classList.toggle('active');
+
+                if (isMicMuted) {
+                    clearInterval(voiceInterval);
+                    socket.emit('voice-activity', false);
+                } else {
+                    startVoiceDetection();
+                }
             }
         };
+
+        function startVoiceDetection() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(localStream);
+                microphone.connect(analyser);
+                analyser.fftSize = 256;
+            }
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let isSpeaking = false;
+            let lastSpeaking = false;
+
+            voiceInterval = setInterval(() => {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / dataArray.length;
+                isSpeaking = average > speakingThreshold;
+
+                if (isSpeaking !== lastSpeaking) {
+                    socket.emit('voice-activity', isSpeaking);
+                    const myUserItem = document.querySelector(`.my-controls`);
+                    if (myUserItem) {
+                        if (isSpeaking) {
+                            myUserItem.classList.add('speaking');
+                        } else {
+                            myUserItem.classList.remove('speaking');
+                        }
+                    }
+                    lastSpeaking = isSpeaking;
+                }
+            }, 100);
+        }
         
         callBtn.onclick = async () => {
             if (!username) {
@@ -349,7 +462,7 @@
             }
             try {
                 localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                localStream.getAudioTracks().forEach(track => track.enabled = false); // Başlangıçta ses kapalı
+                localStream.getAudioTracks().forEach(track => track.enabled = false);
                 isMicMuted = true;
                 toggleMicBtn.innerText = 'Sesi Aç';
                 toggleMicBtn.classList.remove('active');
@@ -368,15 +481,20 @@
         socket.on('call', async (data) => {
             if (!peerConnections[data.caller]) {
                 const newPeerConnection = new RTCPeerConnection(config);
+                newPeerConnection.remoteUsername = data.caller;
                 peerConnections[data.caller] = newPeerConnection;
+                
+                iceCandidateQueues[data.caller] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
                 
                 newPeerConnection.ontrack = e => {
-                    const audio = document.createElement("audio");
-                    audio.srcObject = e.streams[0];
-                    audio.autoplay = true;
-                    document.body.appendChild(audio);
+                    if (e.track.kind === 'audio') {
+                        const audio = document.createElement("audio");
+                        audio.srcObject = e.streams[0];
+                        audio.autoplay = true;
+                        document.body.appendChild(audio);
+                    }
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -394,15 +512,20 @@
         socket.on('offer', async (data) => {
             if (data.to === username && !peerConnections[data.from]) {
                 const newPeerConnection = new RTCPeerConnection(config);
+                newPeerConnection.remoteUsername = data.from;
                 peerConnections[data.from] = newPeerConnection;
+                
+                iceCandidateQueues[data.from] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
 
                 newPeerConnection.ontrack = e => {
-                    const audio = document.createElement("audio");
-                    audio.srcObject = e.streams[0];
-                    audio.autoplay = true;
-                    document.body.appendChild(audio);
+                    if (e.track.kind === 'audio') {
+                        const audio = document.createElement("audio");
+                        audio.srcObject = e.streams[0];
+                        audio.autoplay = true;
+                        document.body.appendChild(audio);
+                    }
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -412,6 +535,12 @@
                 };
 
                 await newPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                
+                if (iceCandidateQueues[data.from]) {
+                    iceCandidateQueues[data.from].forEach(candidate => newPeerConnection.addIceCandidate(candidate));
+                    iceCandidateQueues[data.from] = null; 
+                }
+                
                 const answer = await newPeerConnection.createAnswer();
                 await newPeerConnection.setLocalDescription(answer);
                 socket.emit('answer', { to: data.from, answer: answer });
@@ -420,25 +549,50 @@
         
         socket.on('answer', async (data) => {
             if (data.to === username) {
-                await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.answer));
+                const peer = peerConnections[data.from];
+                await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
+
+                if (iceCandidateQueues[data.from]) {
+                    iceCandidateQueues[data.from].forEach(candidate => peer.addIceCandidate(candidate));
+                    iceCandidateQueues[data.from] = null; 
+                }
             }
         });
 
         socket.on('ice-candidate', async (data) => {
             if (data.to === username) {
-                try {
-                    await peerConnections[data.from].addIceCandidate(data.candidate);
-                } catch(e){
-                    console.error("ICE adayında hata:", e);
+                const peer = peerConnections[data.from];
+                if (peer) {
+                    if (peer.remoteDescription) {
+                        try {
+                            await peer.addIceCandidate(data.candidate);
+                        } catch(e){
+                            console.error("ICE adayında hata:", e);
+                        }
+                    } else {
+                        iceCandidateQueues[data.from].push(data.candidate);
+                    }
+                } else {
+                    console.warn(`ICE adayı için hedef kullanıcı bulunamadı: ${data.from}`);
                 }
             }
         });
 
         socket.on('disconnect-user', (disconnectedUser) => {
-            delete peerConnections[disconnectedUser];
+            if (peerConnections[disconnectedUser]) {
+                 peerConnections[disconnectedUser].close();
+                 delete peerConnections[disconnectedUser];
+            }
+            if (iceCandidateQueues[disconnectedUser]) {
+                delete iceCandidateQueues[disconnectedUser];
+            }
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
+            }
+            const userItemLeft = document.querySelector(`#otherUsersList li[data-username="${disconnectedUser}"]`);
+            if (userItemLeft) {
+                userItemLeft.remove();
             }
         });
 
