@@ -58,10 +58,17 @@
             margin-bottom: 20px;
         }
 
-        #username-input {
+        #username-input, #profilePicInput {
             padding: 8px;
             border-radius: 5px;
             border: 1px solid #ccc;
+        }
+
+        #profilePicPreview {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
         }
         
         #callBtn, .action-btn {
@@ -99,7 +106,7 @@
             margin-top: 0;
         }
 
-        .my-controls {
+        .my-controls, .other-controls {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -107,11 +114,11 @@
             background-color: rgba(0, 0, 0, 0.5);
             padding: 8px;
             border-radius: 5px;
-            flex-direction: column;
         }
 
-        .my-controls .user-name {
+        .my-controls .user-name, .other-controls .user-name {
             flex-grow: 1;
+            margin-left: 10px;
         }
 
         #otherUsersList {
@@ -121,28 +128,12 @@
         }
 
         #otherUsersList li {
+            display: flex;
+            align-items: center;
             padding: 8px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
             margin-bottom: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .voice-bar-container {
-            width: 100%;
-            height: 6px;
-            background-color: #444;
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .voice-bar {
-            width: 0%;
-            height: 100%;
-            background-color: #5cb85c;
-            transition: width 0.1s linear;
         }
 
         #chat-container {
@@ -221,6 +212,14 @@
         .mute-btn.active {
             background-color: #5cb85c;
         }
+
+        .volume-bar {
+            height: 5px;
+            background-color: #5cb85c;
+            width: 0%;
+            border-radius: 2px;
+            margin-top: 3px;
+        }
     </style>
 </head>
 <body>
@@ -231,6 +230,8 @@
         
         <div id="username-container">
             <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
+            <input type="file" id="profilePicInput" accept="image/*">
+            <img id="profilePicPreview" src="" alt="Profil Fotoğrafı">
             <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
         </div>
 
@@ -241,9 +242,10 @@
         <div id="voice-control-panel">
             <h3>Ses Kontrol Paneli</h3>
             <div class="user-item my-controls" style="display: none;">
+                <img id="myProfilePic" src="" style="width:30px;height:30px;border-radius:50%;">
                 <span class="user-name" id="my-username"></span>
                 <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
-                <div class="voice-bar-container"><div class="voice-bar" id="my-voice-bar"></div></div>
+                <div class="volume-bar" id="myVolumeBar"></div>
             </div>
             <ul id="otherUsersList"></ul>
         </div>
@@ -268,7 +270,6 @@
         const socket = io();
         let localStream;
         const peerConnections = {};
-        const peerVoiceBars = {};
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
@@ -282,99 +283,90 @@
         const myUsernameSpan = document.getElementById('my-username');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const callBtn = document.getElementById('callBtn');
-        const myVoiceBar = document.getElementById('my-voice-bar');
+        const profilePicInput = document.getElementById('profilePicInput');
+        const profilePicPreview = document.getElementById('profilePicPreview');
+        const myProfilePic = document.getElementById('myProfilePic');
+        const myVolumeBar = document.getElementById('myVolumeBar');
+
         let username = '';
         let isMicMuted = true;
+        let myPhoto = '';
 
+        const audioConstraints = { audio: { noiseSuppression: true } };
         const forbiddenUsernames = ['yarrak','siktir','orospu','amcık','am','allah','amk','sg','ananı','sikeyim','ananısikeyim'];
-
-        function setupVoiceBar(stream, barElement){
-            const audioCtx = new AudioContext();
-            const source = audioCtx.createMediaStreamSource(stream);
-            const analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            function update() {
-                analyser.getByteFrequencyData(dataArray);
-                const sum = dataArray.reduce((a,b)=>a+b,0);
-                barElement.style.width = Math.min(100, (sum/dataArray.length/128)*100) + '%';
-                requestAnimationFrame(update);
-            }
-            update();
-        }
-
-        function addRemoteUser(user){
-            if(user===username || peerVoiceBars[user]) return;
-            const li = document.createElement('li');
-            li.id = 'remote-'+user;
-            li.innerText = user;
-            const barContainer = document.createElement('div');
-            barContainer.classList.add('voice-bar-container');
-            const bar = document.createElement('div');
-            bar.classList.add('voice-bar');
-            barContainer.appendChild(bar);
-            li.appendChild(barContainer);
-            otherUsersList.appendChild(li);
-            peerVoiceBars[user] = bar;
-        }
-
-        function setupRemoteVoiceBar(stream, barElement){
-            const audioCtx = new AudioContext();
-            const source = audioCtx.createMediaStreamSource(stream);
-            const analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            function update() {
-                analyser.getByteFrequencyData(dataArray);
-                const sum = dataArray.reduce((a,b)=>a+b,0);
-                barElement.style.width = Math.min(100,(sum/dataArray.length/128)*100)+'%';
-                requestAnimationFrame(update);
-            }
-            update();
-        }
 
         window.onload = () => {
             const savedUsername = localStorage.getItem('username');
+            const savedPhoto = localStorage.getItem('profilePhoto');
             if(savedUsername){
                 username = savedUsername;
-                socket.emit('set-username',username);
-                usernameContainer.style.display='none';
+                socket.emit('set-username', username);
+                usernameContainer.style.display = 'none';
+            }
+            if(savedPhoto){
+                myPhoto = savedPhoto;
+                profilePicPreview.src = savedPhoto;
+                myProfilePic.src = savedPhoto;
             }
         };
 
         saveUsernameBtn.onclick = () => {
-            const entered = usernameInput.value.trim().toLowerCase();
-            if(!entered){ alert('Lütfen bir kullanıcı adı girin.'); return; }
-            if(forbiddenUsernames.some(w=>entered.includes(w))){ alert('Uygunsuz isim'); return; }
-            username = entered;
-            localStorage.setItem('username',username);
-            socket.emit('set-username',username);
-            alert('Kaydedildi: '+username);
-            usernameContainer.style.display='none';
+            const enteredUsername = usernameInput.value.trim().toLowerCase();
+            if(!enteredUsername){ alert('Lütfen bir kullanıcı adı girin.'); return; }
+            const isForbidden = forbiddenUsernames.some(word => enteredUsername.includes(word));
+            if(isForbidden){ alert('Bu kullanıcı adı uygunsuz kelimeler içeriyor.'); return; }
+            username = enteredUsername;
+            localStorage.setItem('username', username);
+            localStorage.setItem('profilePhoto', myPhoto);
+            socket.emit('set-username', username);
+            socket.emit('update-profile-pic', { username, photo: myPhoto });
+            alert('Kullanıcı adınız kaydedildi: '+username);
+            usernameContainer.style.display = 'none';
         };
 
+        profilePicInput.addEventListener('change', (event)=>{
+            const file = event.target.files[0];
+            if(file){
+                const reader = new FileReader();
+                reader.onload = e => {
+                    myPhoto = e.target.result;
+                    profilePicPreview.src = myPhoto;
+                    myProfilePic.src = myPhoto;
+                    socket.emit('update-profile-pic', { username, photo: myPhoto });
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
         sendButton.onclick = () => {
-            const msg = messageInput.value;
-            if(msg){
-                socket.emit('message',{username:username||'anonim',text:msg});
-                messageInput.value='';
+            const message = messageInput.value;
+            if(message){
+                const messageData = { username: username || 'anonim', text: message };
+                socket.emit('message', messageData);
+                messageInput.value = '';
             }
         };
 
-        socket.on('message',data=>{
-            const div = document.createElement('div');
-            div.innerText = data.username+': '+data.text;
-            messagesDiv.appendChild(div);
+        socket.on('message', data => {
+            const messageElement = document.createElement('div');
+            messageElement.innerText = `${data.username}: ${data.text}`;
+            messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
 
-        socket.on('user-list-update', users=>{
-            userList.innerHTML=''; otherUsersList.innerHTML='';
+        socket.on('user-list-update', users => {
+            userList.innerHTML = '';
+            otherUsersList.innerHTML = '';
             users.forEach(user=>{
-                const li = document.createElement('li'); li.innerText = user; userList.appendChild(li);
-                if(user!==username) addRemoteUser(user);
+                const li = document.createElement('li');
+                li.innerText = user;
+                userList.appendChild(li);
+                if(user !== username){
+                    const liOther = document.createElement('li');
+                    liOther.id = 'remote-'+user;
+                    liOther.innerHTML = `<img src="" style="width:30px;height:30px;border-radius:50;"><span class="user-name">${user}</span><div class="volume-bar" id="vol-${user}"></div>`;
+                    otherUsersList.appendChild(liOther);
+                }
             });
         });
 
@@ -382,7 +374,7 @@
             if(localStream){
                 isMicMuted = !isMicMuted;
                 localStream.getAudioTracks().forEach(track=>track.enabled=!isMicMuted);
-                toggleMicBtn.innerText=isMicMuted?'Sesi Aç':'Sesi Kapat';
+                toggleMicBtn.innerText = isMicMuted?'Sesi Aç':'Sesi Kapat';
                 toggleMicBtn.classList.toggle('active');
             }
         };
@@ -390,69 +382,55 @@
         callBtn.onclick = async () => {
             if(!username){ alert('Lütfen önce bir kullanıcı adı girin!'); return; }
             try{
-                localStream = await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true}});
+                localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
                 localStream.getAudioTracks().forEach(track=>track.enabled=false);
-                isMicMuted=true;
+                isMicMuted = true;
                 toggleMicBtn.innerText='Sesi Aç';
                 toggleMicBtn.classList.remove('active');
-                myUsernameSpan.innerText=username;
+                myUsernameSpan.innerText = username;
                 myControlsDiv.style.display='flex';
                 callBtn.style.display='none';
-                setupVoiceBar(localStream,myVoiceBar);
-                socket.emit('call',{caller:username});
-            }catch(e){ console.error(e); alert('Mikrofonunuza izin verin!'); }
+                socket.emit('call', { caller: username });
+                setupVolumeMeter('my', localStream);
+            }catch(e){ console.error("Mikrofona erişilemedi:",e); alert("Mikrofonunuza izin vermelisiniz!"); }
         };
 
-        socket.on('call', async data=>{
+        socket.on('call', async (data) => {
             if(!peerConnections[data.caller]){
                 const pc = new RTCPeerConnection(config);
-                peerConnections[data.caller]=pc;
-                localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+                peerConnections[data.caller] = pc;
+                localStream.getTracks().forEach(track=>pc.addTrack(track, localStream));
+
                 pc.ontrack = e => {
-                    const audio = document.createElement('audio');
+                    const audio = document.createElement("audio");
                     audio.srcObject = e.streams[0];
-                    audio.autoplay=true; audio.style.display='none'; document.body.appendChild(audio);
-                    addRemoteUser(data.caller);
-                    setupRemoteVoiceBar(e.streams[0],peerVoiceBars[data.caller]);
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
+                    setupVolumeMeter(data.caller, e.streams[0]);
                 };
-                pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate',{to:data.caller,candidate:e.candidate}); };
-                const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-                socket.emit('offer',{to:data.caller,offer:offer,from:username});
+
+                pc.onicecandidate = e => { if(e.candidate) socket.emit("ice-candidate",{to:data.caller,candidate:e.candidate}); };
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('offer',{to:data.caller,offer:offer});
             }
         });
 
-        socket.on('offer', async data=>{
+        socket.on('offer', async (data)=>{
             if(data.to===username && !peerConnections[data.from]){
                 const pc = new RTCPeerConnection(config);
                 peerConnections[data.from]=pc;
-                localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-                pc.ontrack = e => {
-                    const audio = document.createElement('audio');
+                localStream.getTracks().forEach(track=>pc.addTrack(track, localStream));
+
+                pc.ontrack = e=>{
+                    const audio=document.createElement("audio");
                     audio.srcObject = e.streams[0];
-                    audio.autoplay=true; audio.style.display='none'; document.body.appendChild(audio);
-                    addRemoteUser(data.from);
-                    setupRemoteVoiceBar(e.streams[0],peerVoiceBars[data.from]);
+                    audio.autoplay=true;
+                    document.body.appendChild(audio);
+                    setupVolumeMeter(data.from, e.streams[0]);
                 };
-                pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate',{to:data.from,candidate:e.candidate}); };
+                pc.onicecandidate = e=>{if(e.candidate) socket.emit("ice-candidate",{to:data.from,candidate:e.candidate});};
                 await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-                const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-                socket.emit('answer',{to:data.from,answer:answer,from:username});
-            }
-        });
-
-        socket.on('answer', async data=>{
-            if(data.to===username) await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.answer));
-        });
-
-        socket.on('ice-candidate', async data=>{
-            if(data.to===username) try{ await peerConnections[data.from].addIceCandidate(data.candidate); }catch(e){ console.error(e); }
-        });
-
-        socket.on('disconnect-user', user=>{
-            delete peerConnections[user];
-            const li = document.getElementById('remote-'+user);
-            if(li) li.remove();
-        });
-    </script>
-</body>
-</html>
+                const answer=await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.emit('answer',{to:data.from,answer:answer
