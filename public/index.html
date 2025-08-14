@@ -1,11 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sesli Arama Emir baba tarafından</title>
+  <title>Sesli Arama</title>
+  <style>
+    body {
+      background-image: url("https://raw.githubusercontent.com/emirx422/voice-call/main/public/Brawl%20Stars%20Wallpaper.jpg");
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-position: center;
+      color: white; /* Yazıların okunabilmesi için rengi beyaz yapıyoruz */
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+    }
+    h1, button {
+      background-color: rgba(0, 0, 0, 0.5); /* Arka planı hafif şeffaf yaparak okunabilirliği artırıyoruz */
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Sesli Arama</h1>
-  <button id="callBtn">Sesli Aramaya Geç!</button>
+  <h1>Sesli Arama babazırolar için</h1>
+  <button id="callBtn">Sesli aramak için tıkla</button>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
