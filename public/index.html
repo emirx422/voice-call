@@ -291,7 +291,7 @@
         let localStream;
         let screenStream;
         const peerConnections = {};
-        const sharedStreams = {}; // Diğer kullanıcılardan gelen ekran akışlarını saklamak için
+        const sharedStreams = {}; 
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
@@ -311,6 +311,7 @@
         let username = '';
         let isMicMuted = true;
         let isScreenSharing = false;
+        const iceCandidateQueues = {}; // ICE adaylarını bekletmek için yeni bir obje
         
         const audioConstraints = {
             audio: {
@@ -456,7 +457,13 @@
                     for (const peerId in peerConnections) {
                         const peer = peerConnections[peerId];
                         screenStream.getTracks().forEach(track => {
-                            peer.addTrack(track, screenStream);
+                            // Eski track'i bulup yerine yenisini ekle
+                            const sender = peer.getSenders().find(s => s.track.kind === track.kind);
+                            if (sender) {
+                                sender.replaceTrack(track);
+                            } else {
+                                peer.addTrack(track, screenStream);
+                            }
                         });
                     }
 
@@ -498,6 +505,9 @@
                 const newPeerConnection = new RTCPeerConnection(config);
                 newPeerConnection.remoteUsername = data.caller;
                 peerConnections[data.caller] = newPeerConnection;
+                
+                // ICE aday kuyruğunu başlat
+                iceCandidateQueues[data.caller] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
                 
@@ -529,6 +539,9 @@
                 const newPeerConnection = new RTCPeerConnection(config);
                 newPeerConnection.remoteUsername = data.from;
                 peerConnections[data.from] = newPeerConnection;
+                
+                // ICE aday kuyruğunu başlat
+                iceCandidateQueues[data.from] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
 
@@ -550,6 +563,13 @@
                 };
 
                 await newPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                
+                // Bekleyen ICE adaylarını ekle
+                if (iceCandidateQueues[data.from]) {
+                    iceCandidateQueues[data.from].forEach(candidate => newPeerConnection.addIceCandidate(candidate));
+                    iceCandidateQueues[data.from] = null; // Kuyruğu temizle
+                }
+                
                 const answer = await newPeerConnection.createAnswer();
                 await newPeerConnection.setLocalDescription(answer);
                 socket.emit('answer', { to: data.from, answer: answer });
@@ -558,23 +578,46 @@
         
         socket.on('answer', async (data) => {
             if (data.to === username) {
-                await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.answer));
+                const peer = peerConnections[data.from];
+                await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
+
+                // Bekleyen ICE adaylarını ekle
+                if (iceCandidateQueues[data.from]) {
+                    iceCandidateQueues[data.from].forEach(candidate => peer.addIceCandidate(candidate));
+                    iceCandidateQueues[data.from] = null; // Kuyruğu temizle
+                }
             }
         });
 
         socket.on('ice-candidate', async (data) => {
             if (data.to === username) {
-                try {
-                    await peerConnections[data.from].addIceCandidate(data.candidate);
-                } catch(e){
-                    console.error("ICE adayında hata:", e);
+                const peer = peerConnections[data.from];
+                if (peer) {
+                    if (peer.remoteDescription) {
+                        try {
+                            await peer.addIceCandidate(data.candidate);
+                        } catch(e){
+                            console.error("ICE adayında hata:", e);
+                        }
+                    } else {
+                        // Remote description henüz ayarlanmamışsa, adayı kuyruğa ekle
+                        iceCandidateQueues[data.from].push(data.candidate);
+                    }
+                } else {
+                    console.warn(`ICE adayı için hedef kullanıcı bulunamadı: ${data.from}`);
                 }
             }
         });
 
         socket.on('disconnect-user', (disconnectedUser) => {
-            delete peerConnections[disconnectedUser];
+            if (peerConnections[disconnectedUser]) {
+                 peerConnections[disconnectedUser].close();
+                 delete peerConnections[disconnectedUser];
+            }
             delete sharedStreams[disconnectedUser];
+            if (iceCandidateQueues[disconnectedUser]) {
+                delete iceCandidateQueues[disconnectedUser];
+            }
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
