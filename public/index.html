@@ -229,7 +229,7 @@
 
         document.getElementById("callBtn").onclick = async () => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            peerConnection = new RTCPeerConnection(config); // Hata burada düzeltildi
+            peerConnection = new RTCPeerConnection(config);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
             peerConnection.ontrack = e => {
                 const audio = document.createElement("audio");
@@ -245,7 +245,7 @@
 
         socket.on("offer", async offer => {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            peerConnection = new RTCPeerConnection(config); // Hata burada da düzeltildi
+            peerConnection = new RTCPeerConnection(config);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
             peerConnection.ontrack = e => {
                 const audio = document.createElement("audio");
