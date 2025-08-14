@@ -27,7 +27,7 @@
         #messageInput { flex-grow:1; padding:10px; border-radius:20px; border:none; background-color:#40444b; color:white; }
         #sendButton { padding:0 20px; border-radius:20px; border:none; background-color:#5865f2; cursor:pointer; transition:0.2s; }
         #sendButton:hover { background-color:#4752c4; }
-        #sendButton[disabled] { background-color: #6a6a6a; cursor: not-allowed; } /* Devre dışı buton stili */
+        #sendButton[disabled] { background-color: #6a6a6a; cursor: not-allowed; }
 
         /* Sağ panel */
         #activeUsersList { width:200px; background-color:#202225; padding:15px; display:flex; flex-direction:column; gap:10px; }
@@ -53,7 +53,7 @@
 
     <div id="left-panel">
         <div id="voice-control-panel">
-            <h3>Sesli Sohbette Olan Kullanıcılar</h3>
+            <h3>Ses Kontrol Paneli</h3>
             <div class="user-item my-controls" style="display:none;">
                 <span class="user-name" id="my-username"></span>
                 <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
@@ -77,7 +77,7 @@
             <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
             <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
         </div>
-        <button id="callBtn" class="action-btn">Sesli Sohbete Katılmak İçin tıkla</button>
+        <button id="callBtn" class="action-btn">Sesli aramak için tıkla</button>
     </div>
 
     <div id="activeUsersList">
@@ -106,9 +106,8 @@
         const callBtn = document.getElementById('callBtn');
         const myVoiceBar = document.getElementById('my-voice-bar');
 
-        const forbiddenUsernames = ['yarrak','siktir','orospu','amcık','am','allah','amk','yarak','piç','sg','ananı','sikeyim','ananısikeyim'];
+        const forbiddenUsernames = ['yarrak','siktir','orospu','amcık','am','allah','amk','sg','ananı','sikeyim','ananısikeyim'];
 
-        // Spam koruması için eklenen değişken
         let isSendingMessage = false;
 
         function setupVoiceBar(stream, barElement) {
@@ -152,7 +151,6 @@
             update();
         }
         
-        // Yeni mesaj geldiğinde bildirim sesi çalan fonksiyon
         function playNotificationSound() {
             const audio = document.getElementById('notification-sound');
             if (document.hidden) {
@@ -162,7 +160,6 @@
             }
         }
 
-        // Mesaj gönderme fonksiyonu (spam korumalı)
         function sendMessage() {
             if (isSendingMessage) {
                 console.log("Lütfen 2 saniye bekleyin.");
@@ -172,34 +169,38 @@
             const msg = messageInput.value.trim();
             if (msg) {
                 isSendingMessage = true;
-                sendButton.disabled = true; // Butonu devre dışı bırak
+                sendButton.disabled = true;
                 
                 socket.emit('message', { username: username || 'anonim', text: msg });
                 messageInput.value = '';
                 
                 setTimeout(() => {
                     isSendingMessage = false;
-                    sendButton.disabled = false; // 2 saniye sonra butonu etkinleştir
-                }, 2000); // 2000 milisaniye = 2 saniye
+                    sendButton.disabled = false;
+                }, 2000);
             }
         }
 
         window.onload=()=>{
-            const saved=localStorage.getItem('username'); if(saved){ username=saved; socket.emit('set-username',username); usernameContainer.style.display='none'; }
+            const saved=localStorage.getItem('username');
+            if(saved){
+                username=saved;
+                socket.emit('set-username',username);
+                usernameContainer.style.display='none';
+            }
         }
 
         saveUsernameBtn.onclick=()=>{
             const entered=usernameInput.value.trim().toLowerCase();
             if(!entered){ alert('Lütfen bir kullanıcı adı girin'); return; }
             if(forbiddenUsernames.some(w=>entered.includes(w))){ alert('Uygunsuz isim'); return; }
-            username=entered; localStorage.setItem('username',username); socket.emit('set-username',username);
+            username=entered; localStorage.setItem('username',username);
+            socket.emit('set-username',username);
             alert('Kaydedildi: '+username); usernameContainer.style.display='none';
         }
 
-        // Gönder butonu tıklandığında sendMessage fonksiyonunu çağır
         sendButton.onclick = sendMessage;
 
-        // Mesaj kutusunda Enter tuşuna basıldığında sendMessage fonksiyonunu çağır
         messageInput.addEventListener('keydown', function(event) {
           if (event.key === 'Enter') {
             sendMessage();
@@ -209,7 +210,7 @@
         socket.on('message',data=>{
             const div=document.createElement('div'); div.classList.add('message'); div.classList.add(data.username===username?'self':'other'); div.innerText=data.username+': '+data.text;
             messagesDiv.appendChild(div); messagesDiv.scrollTop=messagesDiv.scrollHeight;
-            playNotificationSound(); // Yeni mesaj geldiğinde sesi çal
+            playNotificationSound();
         });
 
         socket.on('user-list-update', users=>{
