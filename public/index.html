@@ -239,9 +239,50 @@
             background: #000;
             border: 2px solid white;
         }
+        
+        /* Mobil Görünüm Buton Stili */
+        #toggle-mobile-btn {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        /* Mobil görünümdeyken uygulanacak stiller */
+        body.mobile-view #fisbord {
+            font-size: 60px;
+            margin: 20px 0;
+        }
+
+        body.mobile-view #left-panel {
+            width: 100%;
+            height: auto;
+            position: static;
+            border-radius: 0;
+            margin-top: 10px;
+        }
+
+        body.mobile-view #activeUsersList {
+            width: 100%;
+            position: static;
+            border-radius: 0;
+            margin-top: 10px;
+        }
+
+        body.mobile-view #center-container {
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
+    <button id="toggle-mobile-btn">Mobil Görünüm</button>
+
     <div id="fisbord">Fisbord</div>
 
     <div id="center-container">
@@ -292,7 +333,13 @@
         let screenStream;
         const peerConnections = {};
         const sharedStreams = {}; 
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const config = {
+            iceServers: [
+                { urls: "stun:stun.stunprotocol.org" },
+                { urls: "stun:stun.gmx.net" },
+                { urls: "stun:stun.l.google.com:19302" }
+            ]
+        };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
@@ -311,7 +358,7 @@
         let username = '';
         let isMicMuted = true;
         let isScreenSharing = false;
-        const iceCandidateQueues = {}; // ICE adaylarını bekletmek için yeni bir obje
+        const iceCandidateQueues = {}; 
         
         const audioConstraints = {
             audio: {
@@ -457,7 +504,6 @@
                     for (const peerId in peerConnections) {
                         const peer = peerConnections[peerId];
                         screenStream.getTracks().forEach(track => {
-                            // Eski track'i bulup yerine yenisini ekle
                             const sender = peer.getSenders().find(s => s.track.kind === track.kind);
                             if (sender) {
                                 sender.replaceTrack(track);
@@ -506,7 +552,6 @@
                 newPeerConnection.remoteUsername = data.caller;
                 peerConnections[data.caller] = newPeerConnection;
                 
-                // ICE aday kuyruğunu başlat
                 iceCandidateQueues[data.caller] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
@@ -540,7 +585,6 @@
                 newPeerConnection.remoteUsername = data.from;
                 peerConnections[data.from] = newPeerConnection;
                 
-                // ICE aday kuyruğunu başlat
                 iceCandidateQueues[data.from] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
@@ -564,10 +608,9 @@
 
                 await newPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                 
-                // Bekleyen ICE adaylarını ekle
                 if (iceCandidateQueues[data.from]) {
                     iceCandidateQueues[data.from].forEach(candidate => newPeerConnection.addIceCandidate(candidate));
-                    iceCandidateQueues[data.from] = null; // Kuyruğu temizle
+                    iceCandidateQueues[data.from] = null; 
                 }
                 
                 const answer = await newPeerConnection.createAnswer();
@@ -581,10 +624,9 @@
                 const peer = peerConnections[data.from];
                 await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
 
-                // Bekleyen ICE adaylarını ekle
                 if (iceCandidateQueues[data.from]) {
                     iceCandidateQueues[data.from].forEach(candidate => peer.addIceCandidate(candidate));
-                    iceCandidateQueues[data.from] = null; // Kuyruğu temizle
+                    iceCandidateQueues[data.from] = null; 
                 }
             }
         });
@@ -600,7 +642,6 @@
                             console.error("ICE adayında hata:", e);
                         }
                     } else {
-                        // Remote description henüz ayarlanmamışsa, adayı kuyruğa ekle
                         iceCandidateQueues[data.from].push(data.candidate);
                     }
                 } else {
@@ -631,6 +672,17 @@
                 userItemLeft.remove();
             }
         });
+
+        const toggleMobileBtn = document.getElementById('toggle-mobile-btn');
+
+        toggleMobileBtn.onclick = () => {
+            document.body.classList.toggle('mobile-view');
+            if (document.body.classList.contains('mobile-view')) {
+                toggleMobileBtn.innerText = 'Masaüstü Görünüm';
+            } else {
+                toggleMobileBtn.innerText = 'Mobil Görünüm';
+            }
+        };
 
     </script>
 </body>
