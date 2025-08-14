@@ -34,6 +34,8 @@ io.on('connection', (socket) => {
     });
     
     socket.on('message', (data) => {
+        // Mesaja zaman damgası ekliyoruz
+        data.timestamp = new Date().toLocaleTimeString();
         io.emit('message', data);
     });
 
