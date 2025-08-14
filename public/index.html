@@ -38,7 +38,7 @@
             align-items: center;
             justify-content: center;
             min-height: calc(100vh - 160px);
-            margin-top: -15px; /* 15px yukarı kaydır */
+            margin-top: -15px;
         }
 
         h1 {
@@ -155,8 +155,7 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Sunucu adresini belirtiyoruz, bu önemli!
-        const socket = io('http://localhost:3000');
+        const socket = io();
         let localStream, peerConnection;
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
@@ -168,7 +167,6 @@
         const usernameContainer = document.getElementById('username-container');
         let username = '';
 
-        // Yasaklı kullanıcı adları listesi ve kontrol mekanizması
         const forbiddenUsernames = ['yarrak', 'siktir', 'orospu', 'amcık', 'am', 'allah', 'amk', 'sg', 'ananı', 'sikeyim', 'ananısikeyim'];
 
         window.onload = () => {
