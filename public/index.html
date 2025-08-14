@@ -83,7 +83,6 @@
             color: white;
             cursor: pointer;
         }
-        /* Yeni kullanıcı listesi için CSS */
         #activeUsersList {
             position: fixed;
             right: 10px;
@@ -131,13 +130,26 @@
         const usernameInput = document.getElementById('username-input');
         const saveUsernameBtn = document.getElementById('saveUsernameBtn');
         const userList = document.getElementById('userList');
-        let username = 'anonim'; // Başlangıçta anonim kullanıcı adı
+        const usernameContainer = document.getElementById('username-container');
+        let username = '';
+
+        // Sayfa yüklendiğinde kullanıcı adını kontrol et
+        window.onload = () => {
+            const savedUsername = localStorage.getItem('username');
+            if (savedUsername) {
+                username = savedUsername;
+                socket.emit('set-username', username);
+                usernameContainer.style.display = 'none';
+            }
+        };
 
         saveUsernameBtn.onclick = () => {
             if (usernameInput.value) {
                 username = usernameInput.value;
-                socket.emit('set-username', username); // Kullanıcı adını sunucuya gönder
+                localStorage.setItem('username', username);
+                socket.emit('set-username', username);
                 alert('Kullanıcı adınız kaydedildi: ' + username);
+                usernameContainer.style.display = 'none';
             } else {
                 alert('Lütfen bir kullanıcı adı girin.');
             }
@@ -146,7 +158,7 @@
         sendButton.onclick = () => {
             const message = messageInput.value;
             if (message) {
-                const messageData = { username: username, text: message };
+                const messageData = { username: username || 'anonim', text: message };
                 socket.emit('message', messageData);
                 messageInput.value = '';
             }
@@ -161,7 +173,7 @@
 
         // Sunucudan gelen kullanıcı listesini güncelle
         socket.on('user-list-update', users => {
-            userList.innerHTML = ''; // Listeyi temizle
+            userList.innerHTML = '';
             users.forEach(user => {
                 const li = document.createElement('li');
                 li.innerText = user;
