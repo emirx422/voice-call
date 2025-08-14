@@ -1,13 +1,12 @@
 const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-
 const app = express();
+const http = require('http');
 const server = http.createServer(app);
-const io = socketIo(server);
+const { Server } = require('socket.io');
+const io = new Server(server);
 
-const users = {};
-const userSockets = {};
+const activeUsers = {};
+const userSocketMap = {};
 
 app.use(express.static('public'));
 
@@ -16,82 +15,56 @@ app.get('/', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-    console.log('Yeni bir kullanıcı bağlandı');
+    console.log('Bir kullanıcı bağlandı:', socket.id);
 
     socket.on('set-username', (username) => {
-        if (!username) return;
-        const existingUser = Object.values(users).find(user => user.username === username);
-        if (existingUser) {
-            socket.emit('username-taken');
-            return;
-        }
-
-        users[socket.id] = { username, isSharing: false };
-        userSockets[username] = socket.id;
-
-        io.emit('user-list-update', Object.values(users));
-        console.log(`Kullanıcı adı belirlendi: ${username}`);
+        activeUsers[socket.id] = username;
+        userSocketMap[username] = socket.id;
+        console.log(`Kullanıcı adı ayarlandı: ${username} (${socket.id})`);
+        io.emit('user-list-update', Object.values(activeUsers));
     });
-    
+
     socket.on('message', (data) => {
+        console.log(`Yeni mesaj: ${data.username}: ${data.text}`);
         io.emit('message', data);
     });
 
-    socket.on('call', (data) => {
-        const callerSocket = users[socket.id];
-        if (callerSocket) {
-            io.emit('call', { caller: callerSocket.username });
-        }
+    socket.on('call', ({ caller }) => {
+        io.emit('call', { caller });
     });
-
+    
     socket.on('offer', (data) => {
-        const toSocketId = userSockets[data.to];
-        if (toSocketId) {
-            io.to(toSocketId).emit('offer', { from: users[socket.id].username, offer: data.offer, isSharing: users[socket.id].isSharing });
+        const targetSocketId = userSocketMap[data.to];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('offer', { from: activeUsers[socket.id], to: data.to, offer: data.offer });
         }
     });
 
     socket.on('answer', (data) => {
-        const toSocketId = userSockets[data.to];
-        if (toSocketId) {
-            io.to(toSocketId).emit('answer', { from: users[socket.id].username, answer: data.answer, isSharing: users[socket.id].isSharing });
+        const targetSocketId = userSocketMap[data.to];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('answer', { from: activeUsers[socket.id], to: data.to, answer: data.answer });
         }
     });
-    
+
     socket.on('ice-candidate', (data) => {
-        const toSocketId = userSockets[data.to];
-        if (toSocketId) {
-            io.to(toSocketId).emit('ice-candidate', { from: users[socket.id].username, candidate: data.candidate });
-        }
-    });
-
-    socket.on('start-screen-share', () => {
-        if (users[socket.id]) {
-            users[socket.id].isSharing = true;
-            io.emit('user-list-update', Object.values(users));
-        }
-    });
-
-    socket.on('stop-screen-share', () => {
-        if (users[socket.id]) {
-            users[socket.id].isSharing = false;
-            io.emit('user-list-update', Object.values(users));
+        const targetSocketId = userSocketMap[data.to];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('ice-candidate', { from: activeUsers[socket.id], to: data.to, candidate: data.candidate });
         }
     });
 
     socket.on('disconnect', () => {
-        if (users[socket.id]) {
-            const disconnectedUser = users[socket.id].username;
-            delete userSockets[disconnectedUser];
-            delete users[socket.id];
-            io.emit('disconnect-user', disconnectedUser);
-            io.emit('user-list-update', Object.values(users));
-            console.log(`Kullanıcı ayrıldı: ${disconnectedUser}`);
-        }
+        const disconnectedUser = activeUsers[socket.id];
+        delete activeUsers[socket.id];
+        delete userSocketMap[disconnectedUser];
+        console.log('Bir kullanıcı ayrıldı:', socket.id);
+        io.emit('user-list-update', Object.values(activeUsers));
+        io.emit('disconnect-user', disconnectedUser);
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server ${PORT} portunda çalışıyor`);
+    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
 });
