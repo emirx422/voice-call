@@ -5,6 +5,7 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 
+// activeUsers objesi artık kullanıcı adını ve ekran paylaşım durumunu tutacak
 const activeUsers = {};
 const userSocketMap = {};
 
@@ -14,14 +15,21 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
+// Kullanıcı listesini tüm istemcilere göndermek için merkezi fonksiyon
+function updateUserList() {
+    const userArray = Object.values(activeUsers);
+    io.emit('user-list-update', userArray);
+}
+
 io.on('connection', (socket) => {
     console.log('Bir kullanıcı bağlandı:', socket.id);
 
     socket.on('set-username', (username) => {
-        activeUsers[socket.id] = username;
+        // Kullanıcı adını ve başlangıç ekran paylaşım durumunu kaydet
+        activeUsers[socket.id] = { username, isSharing: false };
         userSocketMap[username] = socket.id;
         console.log(`Kullanıcı adı ayarlandı: ${username} (${socket.id})`);
-        io.emit('user-list-update', Object.values(activeUsers));
+        updateUserList();
     });
 
     socket.on('message', (data) => {
@@ -36,31 +44,48 @@ io.on('connection', (socket) => {
     socket.on('offer', (data) => {
         const targetSocketId = userSocketMap[data.to];
         if (targetSocketId) {
-            io.to(targetSocketId).emit('offer', { from: activeUsers[socket.id], to: data.to, offer: data.offer });
+            io.to(targetSocketId).emit('offer', { from: activeUsers[socket.id].username, to: data.to, offer: data.offer });
         }
     });
 
     socket.on('answer', (data) => {
         const targetSocketId = userSocketMap[data.to];
         if (targetSocketId) {
-            io.to(targetSocketId).emit('answer', { from: activeUsers[socket.id], to: data.to, answer: data.answer });
+            io.to(targetSocketId).emit('answer', { from: activeUsers[socket.id].username, to: data.to, answer: data.answer });
         }
     });
 
     socket.on('ice-candidate', (data) => {
         const targetSocketId = userSocketMap[data.to];
         if (targetSocketId) {
-            io.to(targetSocketId).emit('ice-candidate', { from: activeUsers[socket.id], to: data.to, candidate: data.candidate });
+            io.to(targetSocketId).emit('ice-candidate', { from: activeUsers[socket.id].username, to: data.to, candidate: data.candidate });
+        }
+    });
+
+    // Ekran paylaşımı olayları
+    socket.on('start-screen-share', () => {
+        if (activeUsers[socket.id]) {
+            activeUsers[socket.id].isSharing = true;
+            updateUserList();
+        }
+    });
+
+    socket.on('stop-screen-share', () => {
+        if (activeUsers[socket.id]) {
+            activeUsers[socket.id].isSharing = false;
+            updateUserList();
         }
     });
 
     socket.on('disconnect', () => {
-        const disconnectedUser = activeUsers[socket.id];
-        delete activeUsers[socket.id];
-        delete userSocketMap[disconnectedUser];
-        console.log('Bir kullanıcı ayrıldı:', socket.id);
-        io.emit('user-list-update', Object.values(activeUsers));
-        io.emit('disconnect-user', disconnectedUser);
+        const disconnectedUser = activeUsers[socket.id]?.username;
+        if (disconnectedUser) {
+            delete userSocketMap[disconnectedUser];
+            delete activeUsers[socket.id];
+            console.log('Bir kullanıcı ayrıldı:', socket.id);
+            updateUserList();
+            io.emit('disconnect-user', disconnectedUser);
+        }
     });
 });
 
