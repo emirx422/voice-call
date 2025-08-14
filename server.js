@@ -62,7 +62,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Ekran paylaşımı olayları
+    // EKran paylaşımı olayları
     socket.on('start-screen-share', () => {
         if (activeUsers[socket.id]) {
             activeUsers[socket.id].isSharing = true;
