@@ -239,50 +239,9 @@
             background: #000;
             border: 2px solid white;
         }
-        
-        /* Mobil Görünüm Buton Stili */
-        #toggle-mobile-btn {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            padding: 10px 15px;
-            border-radius: 5px;
-            border: none;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-            z-index: 100;
-        }
-
-        /* Mobil görünümdeyken uygulanacak stiller */
-        body.mobile-view #fisbord {
-            font-size: 60px;
-            margin: 20px 0;
-        }
-
-        body.mobile-view #left-panel {
-            width: 100%;
-            height: auto;
-            position: static;
-            border-radius: 0;
-            margin-top: 10px;
-        }
-
-        body.mobile-view #activeUsersList {
-            width: 100%;
-            position: static;
-            border-radius: 0;
-            margin-top: 10px;
-        }
-
-        body.mobile-view #center-container {
-            padding: 20px;
-        }
     </style>
 </head>
 <body>
-    <button id="toggle-mobile-btn">Mobil Görünüm</button>
-
     <div id="fisbord">Fisbord</div>
 
     <div id="center-container">
@@ -672,17 +631,6 @@
                 userItemLeft.remove();
             }
         });
-
-        const toggleMobileBtn = document.getElementById('toggle-mobile-btn');
-
-        toggleMobileBtn.onclick = () => {
-            document.body.classList.toggle('mobile-view');
-            if (document.body.classList.contains('mobile-view')) {
-                toggleMobileBtn.innerText = 'Masaüstü Görünüm';
-            } else {
-                toggleMobileBtn.innerText = 'Mobil Görünüm';
-            }
-        };
 
     </script>
 </body>
