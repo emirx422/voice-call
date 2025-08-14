@@ -63,7 +63,7 @@
             border-radius: 5px;
             border: 1px solid #ccc;
         }
-
+        
         #callBtn, .action-btn {
             padding: 20px 30px;
             border-radius: 5px;
@@ -84,10 +84,10 @@
             background-color: rgba(0, 0, 0, 0.7);
             padding: 15px;
             border-radius: 10px;
-            display: none; /* Varsayılan olarak gizli */
+            display: flex;
             flex-direction: column;
         }
-
+        
         #voice-control-panel {
             padding-bottom: 15px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
@@ -109,40 +109,21 @@
             border-radius: 5px;
         }
 
-        .user-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 8px;
-            border-radius: 5px;
-            margin-bottom: 8px;
-        }
-
-        .user-name {
+        .my-controls .user-name {
             flex-grow: 1;
-        }
-
-        .sound-bar-container {
-            width: 50px;
-            height: 15px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            overflow: hidden;
-            margin-left: 10px;
-        }
-
-        .sound-bar {
-            width: 0%;
-            height: 100%;
-            background-color: #4CAF50;
-            transition: width 0.1s ease-in-out;
         }
 
         #otherUsersList {
             list-style-type: none;
             padding: 0;
             margin: 0;
+        }
+
+        #otherUsersList li {
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            margin-bottom: 8px;
         }
 
         #chat-container {
@@ -200,7 +181,7 @@
         #activeUsersList h3 {
             margin-top: 0;
         }
-
+        
         #userList {
             list-style-type: none;
             padding: 0;
@@ -214,11 +195,12 @@
             cursor: pointer;
             font-size: 14px;
             color: white;
+            background-color: #d9534f; /* Kırmızı, Muted */
             transition: background-color 0.2s ease;
-            background-color: #d9534f;
         }
+
         .mute-btn.active {
-            background-color: #5cb85c;
+            background-color: #5cb85c; /* Yeşil, Unmuted */
         }
     </style>
 </head>
@@ -239,14 +221,9 @@
     <div id="left-panel">
         <div id="voice-control-panel">
             <h3>Ses Kontrol Paneli</h3>
-            <div class="user-item my-controls">
+            <div class="user-item my-controls" style="display: none;">
                 <span class="user-name" id="my-username"></span>
-                <div class="sound-bar-container">
-                    <div id="my-sound-bar" class="sound-bar"></div>
-                </div>
-                <div style="display: flex; gap: 5px;">
-                    <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
-                </div>
+                <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
             </div>
             <ul id="otherUsersList"></ul>
         </div>
@@ -265,32 +242,13 @@
         <h3>Aktif Kullanıcılar:</h3>
         <ul id="userList"></ul>
     </div>
-    
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let localStream;
         const peerConnections = {};
-        const config = {
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-                {
-                    urls: "turn:openrelay.metered.ca:80",
-                    username: "openrelay",
-                    credential: "openrelay"
-                },
-                {
-                    urls: "turn:openrelay.metered.ca:443",
-                    username: "openrelay",
-                    credential: "openrelay"
-                },
-                {
-                    urls: "turn:openrelay.metered.ca:443?transport=tcp",
-                    username: "openrelay",
-                    credential: "openrelay"
-                },
-            ]
-        };
+        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
@@ -303,18 +261,9 @@
         const myUsernameSpan = document.getElementById('my-username');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const callBtn = document.getElementById('callBtn');
-        const leftPanel = document.getElementById('left-panel');
-
         let username = '';
         let isMicMuted = true;
-        const iceCandidateQueues = {};
-
-        // Ses çubuğu için Web Audio API değişkenleri
-        let audioContext;
-        let analyser;
-        let micSource;
-        let isVisualizing = false;
-
+        
         const audioConstraints = {
             audio: {
                 noiseSuppression: true
@@ -329,13 +278,9 @@
                 username = savedUsername;
                 socket.emit('set-username', username);
                 usernameContainer.style.display = 'none';
-                document.querySelector('h1').innerText = `Hoş geldin, ${username}! Sesli sohbete katıl.`;
-            } else {
-                callBtn.disabled = true;
-                callBtn.innerText = 'Önce kullanıcı adı belirle';
             }
         };
-        
+
         saveUsernameBtn.onclick = () => {
             const enteredUsername = usernameInput.value.trim().toLowerCase();
             if (!enteredUsername) {
@@ -352,11 +297,8 @@
             socket.emit('set-username', username);
             alert('Kullanıcı adınız kaydedildi: ' + username);
             usernameContainer.style.display = 'none';
-            callBtn.disabled = false;
-            callBtn.innerText = 'Sesli aramak için tıkla';
-            document.querySelector('h1').innerText = `Hoş geldin, ${username}! Sesli sohbete katıl.`;
         };
-        
+
         sendButton.onclick = () => {
             const message = messageInput.value;
             if (message) {
@@ -375,23 +317,22 @@
         
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
-            otherUsersList.innerHTML = '';
-            
+            otherUsersList.innerHTML = ''; // Diğer kullanıcılar listesini temizle
+
             users.forEach(user => {
                 const li = document.createElement('li');
-                li.innerText = user.username;
+                li.innerText = user;
                 userList.appendChild(li);
-                
-                if (user.username !== username) {
+
+                // Kendi kullanıcı adımızı diğer kullanıcılar listesine ekleme
+                if (user !== username) {
                     const liOther = document.createElement('li');
-                    liOther.classList.add('user-item');
-                    liOther.setAttribute('data-username', user.username);
-                    liOther.innerHTML = `<span class="user-name">${user.username}</span><div class="sound-bar-container"><div class="sound-bar" data-username="${user.username}"></div></div>`;
+                    liOther.innerText = user;
                     otherUsersList.appendChild(liOther);
                 }
             });
         });
-
+        
         toggleMicBtn.onclick = () => {
             if (localStream) {
                 isMicMuted = !isMicMuted;
@@ -400,7 +341,7 @@
                 toggleMicBtn.classList.toggle('active');
             }
         };
-
+        
         callBtn.onclick = async () => {
             if (!username) {
                 alert('Lütfen önce bir kullanıcı adı girin!');
@@ -408,20 +349,15 @@
             }
             try {
                 localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                localStream.getAudioTracks().forEach(track => track.enabled = false);
+                localStream.getAudioTracks().forEach(track => track.enabled = false); // Başlangıçta ses kapalı
                 isMicMuted = true;
                 toggleMicBtn.innerText = 'Sesi Aç';
                 toggleMicBtn.classList.remove('active');
-                
+
                 myUsernameSpan.innerText = username;
                 myControlsDiv.style.display = 'flex';
                 callBtn.style.display = 'none';
-                usernameContainer.style.display = 'none';
-                leftPanel.style.display = 'flex';
                 
-                // Ses görselleştirmesini başlat
-                startVisualization();
-
                 socket.emit('call', { caller: username });
             } catch (e) {
                 console.error("Mikrofona erişilemedi veya hata oluştu:", e);
@@ -430,43 +366,17 @@
         };
 
         socket.on('call', async (data) => {
-            if (!peerConnections[data.caller] && localStream) {
+            if (!peerConnections[data.caller]) {
                 const newPeerConnection = new RTCPeerConnection(config);
-                newPeerConnection.remoteUsername = data.caller;
                 peerConnections[data.caller] = newPeerConnection;
-                
-                iceCandidateQueues[data.caller] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
                 
                 newPeerConnection.ontrack = e => {
-                    if (e.track.kind === 'audio') {
-                        const audio = document.createElement("audio");
-                        audio.srcObject = e.streams[0];
-                        audio.autoplay = true;
-                        document.body.appendChild(audio);
-
-                        // Diğer kullanıcıların sesini görselleştir
-                        const peerAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        const peerAnalyser = peerAudioContext.createAnalyser();
-                        const peerSource = peerAudioContext.createMediaStreamSource(e.streams[0]);
-                        peerSource.connect(peerAnalyser);
-
-                        peerAnalyser.fftSize = 256;
-                        const bufferLength = peerAnalyser.frequencyBinData.length;
-                        const dataArray = new Uint8Array(bufferLength);
-                        const otherSoundBar = document.querySelector(`.sound-bar[data-username="${newPeerConnection.remoteUsername}"]`);
-                        
-                        function updatePeerSoundBar() {
-                            if (!otherSoundBar) return;
-                            peerAnalyser.getByteFrequencyData(dataArray);
-                            const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-                            const soundLevel = Math.min(100, Math.max(0, average * 1.5));
-                            otherSoundBar.style.width = `${soundLevel}%`;
-                            requestAnimationFrame(updatePeerSoundBar);
-                        }
-                        updatePeerSoundBar();
-                    }
+                    const audio = document.createElement("audio");
+                    audio.srcObject = e.streams[0];
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -482,43 +392,17 @@
         });
 
         socket.on('offer', async (data) => {
-            if (data.to === username && localStream && !peerConnections[data.from]) {
+            if (data.to === username && !peerConnections[data.from]) {
                 const newPeerConnection = new RTCPeerConnection(config);
-                newPeerConnection.remoteUsername = data.from;
                 peerConnections[data.from] = newPeerConnection;
-                
-                iceCandidateQueues[data.from] = [];
-                
-                localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
-                
-                newPeerConnection.ontrack = e => {
-                    if (e.track.kind === 'audio') {
-                        const audio = document.createElement("audio");
-                        audio.srcObject = e.streams[0];
-                        audio.autoplay = true;
-                        document.body.appendChild(audio);
-                        
-                        // Diğer kullanıcıların sesini görselleştir
-                        const peerAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        const peerAnalyser = peerAudioContext.createAnalyser();
-                        const peerSource = peerAudioContext.createMediaStreamSource(e.streams[0]);
-                        peerSource.connect(peerAnalyser);
 
-                        peerAnalyser.fftSize = 256;
-                        const bufferLength = peerAnalyser.frequencyBinData.length;
-                        const dataArray = new Uint8Array(bufferLength);
-                        const otherSoundBar = document.querySelector(`.sound-bar[data-username="${newPeerConnection.remoteUsername}"]`);
-                        
-                        function updatePeerSoundBar() {
-                            if (!otherSoundBar) return;
-                            peerAnalyser.getByteFrequencyData(dataArray);
-                            const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-                            const soundLevel = Math.min(100, Math.max(0, average * 1.5));
-                            otherSoundBar.style.width = `${soundLevel}%`;
-                            requestAnimationFrame(updatePeerSoundBar);
-                        }
-                        updatePeerSoundBar();
-                    }
+                localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
+
+                newPeerConnection.ontrack = e => {
+                    const audio = document.createElement("audio");
+                    audio.srcObject = e.streams[0];
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -528,116 +412,35 @@
                 };
 
                 await newPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                
-                if (iceCandidateQueues[data.from]) {
-                    iceCandidateQueues[data.from].forEach(candidate => newPeerConnection.addIceCandidate(candidate));
-                    iceCandidateQueues[data.from] = null;
-                }
-                
                 const answer = await newPeerConnection.createAnswer();
                 await newPeerConnection.setLocalDescription(answer);
                 socket.emit('answer', { to: data.from, answer: answer });
             }
         });
-
+        
         socket.on('answer', async (data) => {
             if (data.to === username) {
-                const peer = peerConnections[data.from];
-                if (peer && peer.signalingState === 'stable') { // Cevap zaten verilmişse tekrar işlem yapma
-                    return;
-                }
-                await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
-
-                if (iceCandidateQueues[data.from]) {
-                    iceCandidateQueues[data.from].forEach(candidate => peer.addIceCandidate(candidate));
-                    iceCandidateQueues[data.from] = null;
-                }
+                await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.answer));
             }
         });
 
         socket.on('ice-candidate', async (data) => {
             if (data.to === username) {
-                const peer = peerConnections[data.from];
-                if (peer) {
-                    if (peer.remoteDescription) {
-                        try {
-                            await peer.addIceCandidate(data.candidate);
-                        } catch(e){
-                            console.error("ICE adayında hata:", e);
-                        }
-                    } else {
-                        iceCandidateQueues[data.from].push(data.candidate);
-                    }
-                } else {
-                    console.warn(`ICE adayı için hedef kullanıcı bulunamadı: ${data.from}`);
+                try {
+                    await peerConnections[data.from].addIceCandidate(data.candidate);
+                } catch(e){
+                    console.error("ICE adayında hata:", e);
                 }
             }
         });
 
         socket.on('disconnect-user', (disconnectedUser) => {
-            if (peerConnections[disconnectedUser]) {
-                peerConnections[disconnectedUser].close();
-                delete peerConnections[disconnectedUser];
-            }
-            if (iceCandidateQueues[disconnectedUser]) {
-                delete iceCandidateQueues[disconnectedUser];
-            }
+            delete peerConnections[disconnectedUser];
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
             }
-            const userItemLeft = document.querySelector(`#otherUsersList li[data-username="${disconnectedUser}"]`);
-            if (userItemLeft) {
-                userItemLeft.remove();
-            }
         });
-
-        // Ses görselleştirmeyi başlatan fonksiyon
-        function startVisualization() {
-            if (isVisualizing) return;
-            
-            if (!localStream) {
-                console.error('Görselleştirme için yerel akış mevcut değil.');
-                return;
-            }
-            
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            
-            analyser = audioContext.createAnalyser();
-            micSource = audioContext.createMediaStreamSource(localStream);
-            micSource.connect(analyser);
-
-            analyser.fftSize = 256;
-            const bufferLength = analyser.frequencyBinData.length;
-            const dataArray = new Uint8Array(bufferLength);
-            const mySoundBar = document.getElementById('my-sound-bar');
-
-            function updateSoundBar() {
-                if (!isVisualizing) {
-                    if (mySoundBar) mySoundBar.style.width = '0%';
-                    return;
-                }
-                analyser.getByteFrequencyData(dataArray);
-                const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-                const soundLevel = Math.min(100, Math.max(0, average * 1.5));
-                if (mySoundBar) mySoundBar.style.width = `${soundLevel}%`;
-                requestAnimationFrame(updateSoundBar);
-            }
-            
-            isVisualizing = true;
-            updateSoundBar();
-        }
-
-        // Ses görselleştirmeyi durduran fonksiyon
-        function stopVisualization() {
-            if (micSource) {
-                micSource.disconnect();
-                micSource = null;
-            }
-            isVisualizing = false;
-        }
 
     </script>
 </body>
