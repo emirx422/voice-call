@@ -2,266 +2,394 @@
 <html>
 <head>
     <title>Fisbord</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        :root {
+            --bg-color: #36393f;
+            --panel-bg: #2f3136;
+            --sidebar-bg: #202225;
+            --main-text-color: #f6f6f7;
+            --secondary-text-color: #b9bbbe;
+            --accent-color: #5865f2; /* Discord'un yeni mavisi */
+            --danger-color: #f04747;
+            --success-color: #43b581;
+            --border-color: #40444b;
+            --hover-color: #3e4147;
+            --font-stack: 'Inter', sans-serif;
+            --message-bg: #32353b;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-stack);
+        }
+
         body {
-            background-image: url("https://raw.githubusercontent.com/emirx422/voice-call/main/public/windows_xp_original-wallpaper-1920x1080.jpg");
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            background-position: center;
-            color: white;
-            font-family: sans-serif;
+            background-color: var(--bg-color);
+            color: var(--main-text-color);
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        #fisbord {
-            font-family: 'Orbitron', sans-serif;
-            font-weight: bold;
-            font-size: 120px;
-            letter-spacing: 5px;
-            background: linear-gradient(90deg, #8B0000, #FF6347);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-align: center;
-            user-select: none;
-            margin: 60px 0 40px 0;
-        }
-
-        #center-container {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: calc(100vh - 160px);
-            margin-top: -15px;
         }
 
-        h1 {
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-            color: white;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        #username-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-
-        #username-input {
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
-        
-        #callBtn, .action-btn {
-            padding: 20px 30px;
-            border-radius: 5px;
-            border: none;
-            background-color: #5cb85c;
-            color: white;
-            cursor: pointer;
-            font-size: 20px;
-            transition: background-color 0.2s ease;
-        }
-
-        #left-panel {
-            position: fixed;
-            left: 10px;
-            top: 10px;
-            width: 300px;
-            height: calc(100vh - 20px);
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        #voice-control-panel {
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            margin-bottom: 15px;
-            flex-shrink: 0;
-        }
-
-        #voice-control-panel h3 {
-            margin-top: 0;
-        }
-
-        .my-controls {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 8px;
-            border-radius: 5px;
-            flex-direction: column;
-        }
-
-        .my-controls .user-name {
-            flex-grow: 1;
-        }
-
-        #otherUsersList {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        #otherUsersList li {
-            padding: 8px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 5px;
-            margin-bottom: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .voice-bar-container {
+        .layout-container {
+            display: grid;
+            grid-template-columns: 72px 240px 1fr 240px;
+            height: 100%;
             width: 100%;
-            height: 6px;
-            background-color: #444;
-            border-radius: 3px;
             overflow: hidden;
         }
 
-        .voice-bar {
-            width: 0%;
-            height: 100%;
-            background-color: #5cb85c;
-            transition: width 0.1s linear;
-        }
-
-        #chat-container {
-            flex-grow: 1;
+        .server-sidebar {
+            background-color: var(--sidebar-bg);
             display: flex;
             flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            overflow-y: auto;
+        }
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            background-color: var(--panel-bg);
+            border-radius: 50%;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: border-radius 0.2s ease, background-color 0.2s ease;
+        }
+        .server-icon:hover {
+            border-radius: 30%;
+            background-color: var(--accent-color);
+        }
+        .server-icon.active {
+            border-radius: 30%;
+            background-color: var(--accent-color);
+        }
+
+        .server-icon i {
+            font-size: 24px;
+            color: var(--main-text-color);
+        }
+
+        .channel-sidebar {
+            background-color: var(--panel-bg);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        .channel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .channel-header h1 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            color: var(--main-text-color);
+        }
+        .channel-header button {
+            background: none;
+            border: none;
+            color: var(--secondary-text-color);
+            cursor: pointer;
+        }
+        .channel-list {
+            list-style: none;
+            padding: 16px;
+            margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        .channel-list li {
+            font-size: 16px;
+            color: var(--secondary-text-color);
+            padding: 8px 0;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .channel-list li:hover {
+            color: var(--main-text-color);
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .chat-header {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+            font-weight: 600;
+        }
+        .chat-header span {
+            color: var(--secondary-text-color);
         }
 
         #messages {
             flex-grow: 1;
-            background-color: rgba(0, 0, 0, 0.5);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
+            padding: 16px;
             overflow-y: auto;
-            font-size: 0.9em;
-            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column-reverse; /* Yeni mesajların alta gelmesi için */
+        }
+        .message {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .message-author {
+            font-weight: 600;
+            color: var(--accent-color);
+            margin-right: 8px;
+        }
+        .message-text {
+            color: var(--main-text-color);
         }
 
         .message-input-container {
-            display: flex;
-            gap: 5px;
-            flex-shrink: 0;
+            padding: 20px 16px;
+            background-color: var(--bg-color);
         }
-
+        .input-wrapper {
+            display: flex;
+            background-color: var(--message-bg);
+            border-radius: 8px;
+            padding: 10px 16px;
+            align-items: center;
+        }
         #messageInput {
             flex-grow: 1;
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
-
-        #sendButton {
-            padding: 8px 15px;
-            border-radius: 5px;
+            background: none;
             border: none;
-            background-color: #5cb85c;
-            color: white;
+            color: var(--main-text-color);
+            font-family: var(--font-stack);
+            font-size: 16px;
+            outline: none;
+        }
+        #sendButton {
+            background: none;
+            border: none;
+            color: var(--secondary-text-color);
             cursor: pointer;
         }
-
-        #activeUsersList {
-            position: fixed;
-            right: 10px;
-            top: 10px;
-            width: 200px;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            color: white;
-            max-height: 90vh;
-            overflow-y: auto;
+        #sendButton:hover {
+            color: var(--accent-color);
         }
 
-        #activeUsersList h3 {
-            margin-top: 0;
+        .member-list {
+            background-color: var(--panel-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
-        
-        #userList {
-            list-style-type: none;
+        .member-list h2 {
+            font-size: 14px;
+            color: var(--secondary-text-color);
+            text-transform: uppercase;
+            margin: 0 0 12px 8px;
+        }
+        .member-list ul {
+            list-style: none;
             padding: 0;
             margin: 0;
+            overflow-y: auto;
         }
-
-        .mute-btn {
-            border: none;
-            padding: 6px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            color: white;
-            background-color: #d9534f;
+        .member-list li {
+            padding: 8px 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
             transition: background-color 0.2s ease;
         }
+        .member-list li:hover {
+            background-color: var(--hover-color);
+        }
+        .member-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online { background-color: var(--success-color); }
 
-        .mute-btn.active {
-            background-color: #5cb85c;
+        #voice-controls-panel {
+            background-color: var(--panel-bg);
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+        }
+        .voice-control-header {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+        }
+        .voice-bar-container {
+            width: 100%;
+            height: 6px;
+            background-color: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .voice-bar {
+            height: 100%;
+            background-color: var(--success-color);
+            transition: width 0.1s linear;
+        }
+        .my-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+        #toggle-mic-btn {
+            background-color: var(--danger-color);
+            color: #fff;
+            padding: 8px 15px;
+            font-weight: 500;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        #toggle-mic-btn.active {
+            background-color: var(--success-color);
+        }
+
+        #auth-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #auth-modal {
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 350px;
+        }
+        #auth-modal h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        #username-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            background-color: var(--hover-color);
+            color: var(--main-text-color);
+            font-size: 16px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        #username-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 1px var(--accent-color);
+        }
+        #saveUsernameBtn {
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #fff;
+            background-color: var(--accent-color);
+            transition: all 0.2s ease;
+        }
+        #saveUsernameBtn:hover {
+            background-color: #6a7ecc;
         }
     </style>
 </head>
 <body>
-    <div id="fisbord">Fisbord</div>
-
-    <div id="center-container">
-        <h1>Sesli Arama babazırrolar için!</h1>
-        
-        <div id="username-container">
+    <div id="auth-modal-overlay">
+        <div id="auth-modal">
+            <h1>Fisbord'a Hoş Geldin</h1>
             <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
-            <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
+            <button id="saveUsernameBtn">Kaydet</button>
         </div>
-
-        <button id="callBtn" class="action-btn">Sesli aramak için tıkla</button>
     </div>
 
-    <div id="left-panel">
-        <div id="voice-control-panel">
-            <h3>Ses Kontrol Paneli</h3>
-            <div class="user-item my-controls" style="display: none;">
-                <span class="user-name" id="my-username"></span>
-                <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
-                <div class="voice-bar-container"><div class="voice-bar" id="my-voice-bar"></div></div>
-            </div>
-            <ul id="otherUsersList"></ul>
+    <div class="layout-container">
+        <div class="server-sidebar">
+            <div class="server-icon active"><i class="fas fa-headset"></i></div>
+            <div class="server-icon"><i class="fas fa-plus"></i></div>
         </div>
 
-        <div id="chat-container">
-            <h3>Sohbet</h3>
+        <div class="channel-sidebar">
+            <div class="channel-header">
+                <h1>Fisbord</h1>
+                <button><i class="fas fa-cog"></i></button>
+            </div>
+            <ul class="channel-list">
+                <li><i class="fas fa-volume-up"></i> Genel Sesli</li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <div class="chat-header">
+                <span>Genel Sesli</span>
+            </div>
             <div id="messages"></div>
             <div class="message-input-container">
-                <input type="text" id="messageInput" placeholder="Mesaj yaz...">
-                <button id="sendButton">Gönder</button>
+                <div class="input-wrapper">
+                    <input type="text" id="messageInput" placeholder="Mesaj gönder #genel-sesli">
+                    <button id="sendButton"><i class="fas fa-paper-plane"></i></button>
+                </div>
             </div>
         </div>
+
+        <div class="member-list">
+            <h2>Aktif Kullanıcılar</h2>
+            <ul id="userList"></ul>
+        </div>
     </div>
-    
-    <div id="activeUsersList">
-        <h3>Aktif Kullanıcılar:</h3>
-        <ul id="userList"></ul>
+
+    <div id="voice-controls-panel">
+        <div class="voice-control-header">Ses Kontrol</div>
+        <div class="user-item my-controls">
+            <span class="user-name" id="my-username"></span>
+            <button id="toggle-mic-btn" class="active">Sesi Kapat</button>
+            <div class="voice-bar-container"><div class="voice-bar" id="my-voice-bar"></div></div>
+        </div>
+        <ul id="otherUsersList"></ul>
     </div>
+
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -277,16 +405,15 @@
         const saveUsernameBtn = document.getElementById('saveUsernameBtn');
         const userList = document.getElementById('userList');
         const otherUsersList = document.getElementById('otherUsersList');
-        const usernameContainer = document.getElementById('username-container');
+        const authModalOverlay = document.getElementById('auth-modal-overlay');
         const myControlsDiv = document.querySelector('.my-controls');
         const myUsernameSpan = document.getElementById('my-username');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
-        const callBtn = document.getElementById('callBtn');
         const myVoiceBar = document.getElementById('my-voice-bar');
         let username = '';
         let isMicMuted = true;
 
-        const forbiddenUsernames = ['yarrak','siktir','orospu','amcık','am','allah','amk','sg','ananı','sikeyim','ananısikeyim'];
+        const forbiddenUsernames = ['yarrak', 'siktir', 'orospu', 'amcık', 'am', 'allah', 'amk', 'sg', 'ananı', 'sikeyim', 'ananısikeyim'];
 
         function setupVoiceBar(stream, barElement){
             const audioCtx = new AudioContext();
@@ -294,29 +421,22 @@
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
             source.connect(analyser);
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const dataArray = new Uint8-bit-integer-array(analyser.frequencyBinCount);
             function update() {
                 analyser.getByteFrequencyData(dataArray);
-                const sum = dataArray.reduce((a,b)=>a+b,0);
-                barElement.style.width = Math.min(100, (sum/dataArray.length/128)*100) + '%';
+                const sum = dataArray.reduce((a, b) => a + b, 0);
+                barElement.style.width = Math.min(100, (sum / dataArray.length / 128) * 100) + '%';
                 requestAnimationFrame(update);
             }
             update();
         }
 
-        function addRemoteUser(user){
-            if(user===username || peerVoiceBars[user]) return;
+        function addRemoteUser(user, isOnline = true){
+            if(user === username || document.getElementById('remote-user-'+user)) return;
             const li = document.createElement('li');
-            li.id = 'remote-'+user;
-            li.innerText = user;
-            const barContainer = document.createElement('div');
-            barContainer.classList.add('voice-bar-container');
-            const bar = document.createElement('div');
-            bar.classList.add('voice-bar');
-            barContainer.appendChild(bar);
-            li.appendChild(barContainer);
+            li.id = 'remote-user-' + user;
+            li.innerHTML = `<span class="member-status-dot ${isOnline ? 'status-online' : ''}"></span>${user}`;
             otherUsersList.appendChild(li);
-            peerVoiceBars[user] = bar;
         }
 
         function setupRemoteVoiceBar(stream, barElement){
@@ -325,7 +445,7 @@
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
             source.connect(analyser);
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const dataArray = new Uint8-bit-integer-array(analyser.frequencyBinCount);
             function update() {
                 analyser.getByteFrequencyData(dataArray);
                 const sum = dataArray.reduce((a,b)=>a+b,0);
@@ -339,96 +459,125 @@
             const savedUsername = localStorage.getItem('username');
             if(savedUsername){
                 username = savedUsername;
-                socket.emit('set-username',username);
-                usernameContainer.style.display='none';
+                socket.emit('set-username', username);
+                authModalOverlay.style.display = 'none';
+                startVoiceCall();
+            } else {
+                authModalOverlay.style.display = 'flex';
             }
         };
 
         saveUsernameBtn.onclick = () => {
             const entered = usernameInput.value.trim().toLowerCase();
             if(!entered){ alert('Lütfen bir kullanıcı adı girin.'); return; }
-            if(forbiddenUsernames.some(w=>entered.includes(w))){ alert('Uygunsuz isim'); return; }
+            if(forbiddenUsernames.some(w => entered.includes(w))){ alert('Uygunsuz isim'); return; }
             username = entered;
-            localStorage.setItem('username',username);
-            socket.emit('set-username',username);
-            alert('Kaydedildi: '+username);
-            usernameContainer.style.display='none';
+            localStorage.setItem('username', username);
+            socket.emit('set-username', username);
+            authModalOverlay.style.display = 'none';
+            startVoiceCall();
         };
+
+        async function startVoiceCall() {
+            try{
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true } });
+                localStream.getAudioTracks().forEach(track => track.enabled = false);
+                isMicMuted = true;
+                toggleMicBtn.innerText = 'Sesi Aç';
+                toggleMicBtn.classList.remove('active');
+                myUsernameSpan.innerText = username;
+                setupVoiceBar(localStream, myVoiceBar);
+                socket.emit('call', { caller: username });
+            }catch(e){
+                console.error(e);
+                alert('Mikrofonunuza izin verin!');
+            }
+        }
 
         sendButton.onclick = () => {
             const msg = messageInput.value;
             if(msg){
-                socket.emit('message',{username:username||'anonim',text:msg});
-                messageInput.value='';
+                socket.emit('message', { username: username || 'anonim', text: msg });
+                messageInput.value = '';
             }
         };
 
-        socket.on('message',data=>{
+        socket.on('message', data => {
             const div = document.createElement('div');
-            div.innerText = data.username+': '+data.text;
-            messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            div.classList.add('message');
+            div.innerHTML = `<span class="message-author">${data.username}</span> <span class="message-text">${data.text}</span>`;
+            messagesDiv.prepend(div);
         });
 
-        socket.on('user-list-update', users=>{
-            userList.innerHTML=''; otherUsersList.innerHTML='';
-            users.forEach(user=>{
-                const li = document.createElement('li'); li.innerText = user; userList.appendChild(li);
-                if(user!==username) addRemoteUser(user);
+        socket.on('user-list-update', users => {
+            userList.innerHTML = '';
+            otherUsersList.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.classList.add('online');
+                li.innerHTML = `<span class="member-status-dot status-online"></span>${user}`;
+                userList.appendChild(li);
+                if(user !== username) {
+                    addRemoteUser(user);
+                }
             });
         });
 
         toggleMicBtn.onclick = () => {
             if(localStream){
                 isMicMuted = !isMicMuted;
-                localStream.getAudioTracks().forEach(track=>track.enabled=!isMicMuted);
-                toggleMicBtn.innerText=isMicMuted?'Sesi Aç':'Sesi Kapat';
+                localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
+                toggleMicBtn.innerText = isMicMuted ? 'Sesi Aç' : 'Sesi Kapat';
                 toggleMicBtn.classList.toggle('active');
             }
         };
 
-        callBtn.onclick = async () => {
-            if(!username){ alert('Lütfen önce bir kullanıcı adı girin!'); return; }
-            try{
-                localStream = await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true}});
-                localStream.getAudioTracks().forEach(track=>track.enabled=false);
-                isMicMuted=true;
-                toggleMicBtn.innerText='Sesi Aç';
-                toggleMicBtn.classList.remove('active');
-                myUsernameSpan.innerText=username;
-                myControlsDiv.style.display='flex';
-                callBtn.style.display='none';
-                setupVoiceBar(localStream,myVoiceBar);
-                socket.emit('call',{caller:username});
-            }catch(e){ console.error(e); alert('Mikrofonunuza izin verin!'); }
-        };
-
-        socket.on('call', async data=>{
+        socket.on('call', async data => {
             if(!peerConnections[data.caller]){
                 const pc = new RTCPeerConnection(config);
-                peerConnections[data.caller]=pc;
-                localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+                peerConnections[data.caller] = pc;
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
                 pc.ontrack = e => {
                     const audio = document.createElement('audio');
                     audio.srcObject = e.streams[0];
-                    audio.autoplay=true; audio.style.display='none'; document.body.appendChild(audio);
+                    audio.autoplay = true; audio.style.display = 'none'; document.body.appendChild(audio);
                     addRemoteUser(data.caller);
-                    setupRemoteVoiceBar(e.streams[0],peerVoiceBars[data.caller]);
                 };
-                pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate',{to:data.caller,candidate:e.candidate}); };
+                pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', { to: data.caller, candidate: e.candidate }); };
                 const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-                socket.emit('offer',{to:data.caller,offer:offer,from:username});
+                socket.emit('offer', { to: data.caller, offer: offer, from: username });
             }
         });
 
-        socket.on('offer', async data=>{
-            if(data.to===username && !peerConnections[data.from]){
+        socket.on('offer', async data => {
+            if(data.to === username && !peerConnections[data.from]){
                 const pc = new RTCPeerConnection(config);
-                peerConnections[data.from]=pc;
-                localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+                peerConnections[data.from] = pc;
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
                 pc.ontrack = e => {
                     const audio = document.createElement('audio');
                     audio.srcObject = e.streams[0];
-                    audio.autoplay=true; audio.style.display='none'; document.body.appendChild(audio);
+                    audio.autoplay = true; audio.style.display = 'none'; document.body.appendChild(audio);
                     addRemoteUser(data.from);
-                    setupRemoteVoiceBar(e.streams[
+                };
+                pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', { to: data.from, candidate: e.candidate }); };
+                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+                socket.emit('answer', { to: data.from, answer: answer, from: username });
+            }
+        });
+
+        socket.on('answer', async data => {
+            if(data.to === username && peerConnections[data.from]){
+                await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+        });
+
+        socket.on('ice-candidate', async data => {
+            if(data.to === username && peerConnections[data.from]){
+                try{ await peerConnections[data.from].addIceCandidate(data.candidate); }catch(e){ console.error(e); }
+            }
+        });
+    </script>
+</body>
+</html>
