@@ -50,7 +50,7 @@
 
         #username-container {
             display: flex;
-            flex-direction: column; 
+            flex-direction: column;
             align-items: center;
             gap: 10px;
             background-color: rgba(0, 0, 0, 0.5);
@@ -82,7 +82,7 @@
             object-fit: cover;
             background-color: rgba(255, 255, 255, 0.2);
             border: 2px solid white;
-            display: none; 
+            display: none;
         }
         
         #profile-pic-label {
@@ -286,7 +286,7 @@
             <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
         </div>
 
-        <button id="callBtn" class="action-btn">Sesli aramak için tıkla</button>
+        <button id="callBtn" class="action-btn" style="display: none;">Sesli aramak için tıkla</button>
     </div>
 
     <div id="left-panel">
@@ -306,8 +306,8 @@
             <h3>Sohbet</h3>
             <div id="messages"></div>
             <div class="message-input-container">
-                <input type="text" id="messageInput" placeholder="Mesaj yaz...">
-                <button id="sendButton">Gönder</button>
+                <input type="text" id="messageInput" placeholder="Mesaj yaz..." disabled>
+                <button id="sendButton" disabled>Gönder</button>
             </div>
         </div>
     </div>
@@ -322,7 +322,7 @@
         const socket = io();
         let localStream;
         const peerConnections = {};
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const config = { iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }] };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
@@ -348,10 +348,16 @@
             }
         };
 
-        // Varsayılan bir profil resmi kullanmak için URL tanımla
         const defaultProfilePic = 'https://raw.githubusercontent.com/emirx422/voice-call/main/public/default-profile.png';
 
         const forbiddenUsernames = ['yarrak', 'siktir', 'orospu', 'amcık', 'am', 'allah', 'amk', 'sg', 'ananı', 'sikeyim', 'ananısikeyim'];
+        
+        function enableCallAndChat() {
+            usernameContainer.style.display = 'none';
+            callBtn.style.display = 'block';
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+        }
 
         window.onload = () => {
             const savedUsername = localStorage.getItem('username');
@@ -363,7 +369,9 @@
                 profilePicPreview.src = profilePic;
                 profilePicPreview.style.display = 'block';
                 socket.emit('set-user-data', { username, profilePic });
-                usernameContainer.style.display = 'none';
+                enableCallAndChat();
+            } else {
+                callBtn.style.display = 'none';
             }
         };
 
@@ -400,17 +408,18 @@
                 localStorage.setItem('profilePic', profilePic);
             } else {
                 localStorage.removeItem('profilePic');
+                profilePic = defaultProfilePic;
             }
             
-            socket.emit('set-user-data', { username, profilePic: profilePic || defaultProfilePic });
+            socket.emit('set-user-data', { username, profilePic });
             alert('Kullanıcı adınız kaydedildi: ' + username);
-            usernameContainer.style.display = 'none';
+            enableCallAndChat();
         };
 
         sendButton.onclick = () => {
             const message = messageInput.value;
             if (message) {
-                const messageData = { username: username || 'anonim', text: message, profilePic: profilePic || defaultProfilePic };
+                const messageData = { username: username, text: message, profilePic: profilePic };
                 socket.emit('message', messageData);
                 messageInput.value = '';
             }
@@ -418,7 +427,7 @@
 
         socket.on('message', data => {
             const messageElement = document.createElement('div');
-            messageElement.innerHTML = `<img src="${data.profilePic || defaultProfilePic}" style="width:20px; height:20px; border-radius:50%; margin-right:5px;"><strong>${data.username}:</strong> ${data.text}`;
+            messageElement.innerHTML = `<img src="${data.profilePic}" style="width:20px; height:20px; border-radius:50%; margin-right:5px;"><strong>${data.username}:</strong> ${data.text}`;
             messageElement.style.display = 'flex';
             messageElement.style.alignItems = 'center';
             messagesDiv.appendChild(messageElement);
@@ -429,31 +438,31 @@
             userList.innerHTML = '';
             otherUsersList.innerHTML = '';
             
-            // Kullanıcı nesnesi yerine sadece kullanıcı adı gönderiliyorsa bu şekilde düzenleyin:
-            // `users` değişkeni { username: string, profilePic: string } objelerinden oluşan bir dizi olmalı
             users.forEach(user => {
                 const isMe = user.username === username;
                 
-                // Sağ panel: Aktif Kullanıcılar
                 const liRight = document.createElement('li');
                 const userImgRight = document.createElement('img');
-                userImgRight.src = user.profilePic || defaultProfilePic;
+                userImgRight.src = user.profilePic;
                 liRight.appendChild(userImgRight);
                 const spanRight = document.createElement('span');
                 spanRight.innerText = user.username;
                 liRight.appendChild(spanRight);
                 userList.appendChild(liRight);
 
-                // Sol panel: Diğer Kullanıcılar
                 if (!isMe) {
                     const liOther = document.createElement('li');
                     const userImgOther = document.createElement('img');
-                    userImgOther.src = user.profilePic || defaultProfilePic;
+                    userImgOther.src = user.profilePic;
                     liOther.appendChild(userImgOther);
                     const spanOther = document.createElement('span');
                     spanOther.innerText = user.username;
                     liOther.appendChild(spanOther);
                     otherUsersList.appendChild(liOther);
+                } else {
+                    myUsernameSpan.innerText = user.username;
+                    myProfilePic.src = user.profilePic;
+                    myControlsDiv.style.display = 'flex';
                 }
             });
         });
@@ -480,7 +489,7 @@
                 toggleMicBtn.classList.remove('active');
 
                 myUsernameSpan.innerText = username;
-                myProfilePic.src = profilePic || defaultProfilePic;
+                myProfilePic.src = profilePic;
                 myControlsDiv.style.display = 'flex';
                 callBtn.style.display = 'none';
                 
@@ -492,7 +501,7 @@
         };
 
         socket.on('call', async (data) => {
-            if (!peerConnections[data.caller]) {
+            if (!peerConnections[data.caller] && data.caller !== username) {
                 const newPeerConnection = new RTCPeerConnection(config);
                 peerConnections[data.caller] = newPeerConnection;
 
@@ -561,9 +570,11 @@
         });
 
         socket.on('disconnect-user', (disconnectedUser) => {
-            delete peerConnections[disconnectedUser];
+            if(peerConnections[disconnectedUser]) {
+                peerConnections[disconnectedUser].close();
+                delete peerConnections[disconnectedUser];
+            }
         });
-
     </script>
 </body>
 </html>
