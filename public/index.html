@@ -113,6 +113,19 @@
             flex-grow: 1;
         }
 
+        #otherUsersList {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #otherUsersList li {
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+
         #chat-container {
             flex-grow: 1;
             display: flex;
@@ -212,6 +225,7 @@
                 <span class="user-name" id="my-username"></span>
                 <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
             </div>
+            <ul id="otherUsersList"></ul>
         </div>
 
         <div id="chat-container">
@@ -241,6 +255,7 @@
         const usernameInput = document.getElementById('username-input');
         const saveUsernameBtn = document.getElementById('saveUsernameBtn');
         const userList = document.getElementById('userList');
+        const otherUsersList = document.getElementById('otherUsersList');
         const usernameContainer = document.getElementById('username-container');
         const myControlsDiv = document.querySelector('.my-controls');
         const myUsernameSpan = document.getElementById('my-username');
@@ -302,10 +317,19 @@
         
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
+            otherUsersList.innerHTML = ''; // Diğer kullanıcılar listesini temizle
+
             users.forEach(user => {
                 const li = document.createElement('li');
                 li.innerText = user;
                 userList.appendChild(li);
+
+                // Kendi kullanıcı adımızı diğer kullanıcılar listesine ekleme
+                if (user !== username) {
+                    const liOther = document.createElement('li');
+                    liOther.innerText = user;
+                    otherUsersList.appendChild(liOther);
+                }
             });
         });
         
@@ -415,10 +439,6 @@
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
-            }
-            const audioElement = document.querySelector(`audio[data-username="${disconnectedUser}"]`);
-            if (audioElement) {
-                audioElement.remove();
             }
         });
 
