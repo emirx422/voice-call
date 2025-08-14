@@ -188,19 +188,45 @@
             margin: 0;
         }
 
-        .mute-btn {
+        .mute-btn, #share-screen-btn {
             border: none;
             padding: 6px 12px;
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
             color: white;
-            background-color: #d9534f; /* Kırmızı, Muted */
             transition: background-color 0.2s ease;
         }
 
+        .mute-btn {
+            background-color: #d9534f; /* Kırmızı, Muted */
+        }
         .mute-btn.active {
             background-color: #5cb85c; /* Yeşil, Unmuted */
+        }
+
+        #share-screen-btn {
+            background-color: #0275d8; /* Mavi, Paylaşım yok */
+        }
+        #share-screen-btn.sharing {
+            background-color: #f0ad4e; /* Turuncu, Paylaşılıyor */
+        }
+
+        #shared-screen-container {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        #shared-screen-container video {
+            width: 320px;
+            height: 180px;
+            background: #000;
+            border: 2px solid white;
         }
     </style>
 </head>
@@ -208,22 +234,23 @@
     <div id="fisbord">Fisbord</div>
 
     <div id="center-container">
-        <h1>Sesli Arama babazırrolar için!</h1>
+        <h1>Sesli Arama Babazırrolar İçin!</h1>
         
         <div id="username-container">
             <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
             <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
         </div>
 
-        <button id="callBtn" class="action-btn">Sesli aramak için tıkla</button>
+        <button id="callBtn" class="action-btn">Sesli Aramaya Katılmak için Tıkla</button>
     </div>
 
     <div id="left-panel">
         <div id="voice-control-panel">
-            <h3>Ses Kontrol Paneli</h3>
+            <h3>Sesli Sohbetteki Kullanıcılar</h3>
             <div class="user-item my-controls" style="display: none;">
                 <span class="user-name" id="my-username"></span>
-                <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
+                <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
+                <button id="share-screen-btn">Ekran Paylaş</button>
             </div>
             <ul id="otherUsersList"></ul>
         </div>
@@ -242,11 +269,14 @@
         <h3>Aktif Kullanıcılar:</h3>
         <ul id="userList"></ul>
     </div>
+    
+    <div id="shared-screen-container"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let localStream;
+        let screenStream;
         const peerConnections = {};
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
@@ -260,9 +290,13 @@
         const myControlsDiv = document.querySelector('.my-controls');
         const myUsernameSpan = document.getElementById('my-username');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
+        const shareScreenBtn = document.getElementById('share-screen-btn');
         const callBtn = document.getElementById('callBtn');
+        const sharedScreenContainer = document.getElementById('shared-screen-container');
+
         let username = '';
         let isMicMuted = true;
+        let isScreenSharing = false;
         
         const audioConstraints = {
             audio: {
@@ -317,14 +351,13 @@
         
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
-            otherUsersList.innerHTML = ''; // Diğer kullanıcılar listesini temizle
+            otherUsersList.innerHTML = '';
 
             users.forEach(user => {
                 const li = document.createElement('li');
                 li.innerText = user;
                 userList.appendChild(li);
 
-                // Kendi kullanıcı adımızı diğer kullanıcılar listesine ekleme
                 if (user !== username) {
                     const liOther = document.createElement('li');
                     liOther.innerText = user;
@@ -341,6 +374,42 @@
                 toggleMicBtn.classList.toggle('active');
             }
         };
+
+        shareScreenBtn.onclick = async () => {
+            if (isScreenSharing) {
+                // Ekran paylaşımını durdur
+                screenStream.getTracks().forEach(track => track.stop());
+                isScreenSharing = false;
+                shareScreenBtn.innerText = "Ekran Paylaş";
+                shareScreenBtn.classList.remove("sharing");
+            } else {
+                // Ekran paylaşımını başlat
+                try {
+                    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                    isScreenSharing = true;
+                    shareScreenBtn.innerText = "Paylaşımı Durdur";
+                    shareScreenBtn.classList.add("sharing");
+                    
+                    // Diğer kullanıcılara ekran akışını gönder
+                    for (const peerId in peerConnections) {
+                        const peer = peerConnections[peerId];
+                        screenStream.getTracks().forEach(track => {
+                            peer.addTrack(track, screenStream);
+                        });
+                    }
+
+                    // Kullanıcı paylaşımı kapatırsa, otomatik olarak durdur
+                    screenStream.getVideoTracks()[0].onended = () => {
+                        isScreenSharing = false;
+                        shareScreenBtn.innerText = "Ekran Paylaş";
+                        shareScreenBtn.classList.remove("sharing");
+                    };
+                } catch (e) {
+                    console.error("Ekran paylaşımı başlatılamadı:", e);
+                    alert("Ekran paylaşımı için izin vermeniz gerekiyor!");
+                }
+            }
+        };
         
         callBtn.onclick = async () => {
             if (!username) {
@@ -349,7 +418,7 @@
             }
             try {
                 localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                localStream.getAudioTracks().forEach(track => track.enabled = false); // Başlangıçta ses kapalı
+                localStream.getAudioTracks().forEach(track => track.enabled = false);
                 isMicMuted = true;
                 toggleMicBtn.innerText = 'Sesi Aç';
                 toggleMicBtn.classList.remove('active');
@@ -373,10 +442,24 @@
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
                 
                 newPeerConnection.ontrack = e => {
-                    const audio = document.createElement("audio");
-                    audio.srcObject = e.streams[0];
-                    audio.autoplay = true;
-                    document.body.appendChild(audio);
+                    if (e.track.kind === 'audio') {
+                        const audio = document.createElement("audio");
+                        audio.srcObject = e.streams[0];
+                        audio.autoplay = true;
+                        document.body.appendChild(audio);
+                    } else if (e.track.kind === 'video') {
+                        const video = document.createElement("video");
+                        video.srcObject = e.streams[0];
+                        video.autoplay = true;
+                        video.playsinline = true;
+                        video.muted = true;
+                        video.setAttribute('data-peer-id', data.caller);
+                        sharedScreenContainer.appendChild(video);
+                        
+                        e.track.onended = () => {
+                            video.remove();
+                        };
+                    }
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -399,10 +482,24 @@
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
 
                 newPeerConnection.ontrack = e => {
-                    const audio = document.createElement("audio");
-                    audio.srcObject = e.streams[0];
-                    audio.autoplay = true;
-                    document.body.appendChild(audio);
+                    if (e.track.kind === 'audio') {
+                        const audio = document.createElement("audio");
+                        audio.srcObject = e.streams[0];
+                        audio.autoplay = true;
+                        document.body.appendChild(audio);
+                    } else if (e.track.kind === 'video') {
+                        const video = document.createElement("video");
+                        video.srcObject = e.streams[0];
+                        video.autoplay = true;
+                        video.playsinline = true;
+                        video.muted = true;
+                        video.setAttribute('data-peer-id', data.from);
+                        sharedScreenContainer.appendChild(video);
+                        
+                        e.track.onended = () => {
+                            video.remove();
+                        };
+                    }
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -439,6 +536,10 @@
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
+            }
+            const videoElement = document.querySelector(`video[data-peer-id="${disconnectedUser}"]`);
+            if (videoElement) {
+                videoElement.remove();
             }
         });
 
