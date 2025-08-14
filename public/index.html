@@ -120,9 +120,6 @@
         }
 
         #otherUsersList li {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             padding: 8px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
@@ -191,53 +188,19 @@
             margin: 0;
         }
 
-        .mute-btn, #share-screen-btn, .watch-btn {
+        .mute-btn {
             border: none;
             padding: 6px 12px;
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
             color: white;
+            background-color: #d9534f; /* Kırmızı, Muted */
             transition: background-color 0.2s ease;
         }
 
-        .mute-btn {
-            background-color: #d9534f; /* Kırmızı, Muted */
-        }
         .mute-btn.active {
             background-color: #5cb85c; /* Yeşil, Unmuted */
-        }
-
-        #share-screen-btn {
-            background-color: #0275d8; /* Mavi, Paylaşım yok */
-        }
-        #share-screen-btn.sharing {
-            background-color: #f0ad4e; /* Turuncu, Paylaşılıyor */
-        }
-
-        .watch-btn {
-            background-color: #17a2b8; /* Mavi-turkuaz, İzle */
-        }
-
-        .watching-btn {
-            background-color: #f0ad4e; /* Turuncu, Durdur */
-        }
-        
-        #shared-screen-container {
-            position: fixed;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            z-index: 10;
-        }
-
-        #shared-screen-container video {
-            width: 320px;
-            height: 180px;
-            background: #000;
-            border: 2px solid white;
         }
     </style>
 </head>
@@ -260,10 +223,7 @@
             <h3>Ses Kontrol Paneli</h3>
             <div class="user-item my-controls" style="display: none;">
                 <span class="user-name" id="my-username"></span>
-                <div style="display: flex; gap: 5px;">
-                    <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
-                    <button id="share-screen-btn">Ekran Paylaş</button>
-                </div>
+                <button id="toggle-mic-btn" class="mute-btn active">Sesi Kapat</button>
             </div>
             <ul id="otherUsersList"></ul>
         </div>
@@ -282,23 +242,13 @@
         <h3>Aktif Kullanıcılar:</h3>
         <ul id="userList"></ul>
     </div>
-    
-    <div id="shared-screen-container"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let localStream;
-        let screenStream;
         const peerConnections = {};
-        const sharedStreams = {}; 
-        const config = {
-            iceServers: [
-                { urls: "stun:stun.stunprotocol.org" },
-                { urls: "stun:stun.gmx.net" },
-                { urls: "stun:stun.l.google.com:19302" }
-            ]
-        };
+        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
@@ -310,14 +260,9 @@
         const myControlsDiv = document.querySelector('.my-controls');
         const myUsernameSpan = document.getElementById('my-username');
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
-        const shareScreenBtn = document.getElementById('share-screen-btn');
         const callBtn = document.getElementById('callBtn');
-        const sharedScreenContainer = document.getElementById('shared-screen-container');
-
         let username = '';
         let isMicMuted = true;
-        let isScreenSharing = false;
-        const iceCandidateQueues = {}; 
         
         const audioConstraints = {
             audio: {
@@ -372,66 +317,21 @@
         
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
-            otherUsersList.innerHTML = '';
+            otherUsersList.innerHTML = ''; // Diğer kullanıcılar listesini temizle
 
             users.forEach(user => {
                 const li = document.createElement('li');
-                li.innerText = user.username;
+                li.innerText = user;
                 userList.appendChild(li);
 
-                if (user.username !== username) {
+                // Kendi kullanıcı adımızı diğer kullanıcılar listesine ekleme
+                if (user !== username) {
                     const liOther = document.createElement('li');
-                    liOther.innerText = user.username;
-                    liOther.setAttribute('data-username', user.username);
-                    
-                    if (user.isSharing) {
-                         const watchBtn = document.createElement('button');
-                         watchBtn.className = 'watch-btn';
-                         watchBtn.innerText = 'İzle';
-                         liOther.appendChild(watchBtn);
-                    }
+                    liOther.innerText = user;
                     otherUsersList.appendChild(liOther);
                 }
             });
-            
-            document.querySelectorAll('.watch-btn').forEach(btn => {
-                btn.onclick = (e) => {
-                    const targetUsername = e.target.closest('li').getAttribute('data-username');
-                    toggleWatchScreen(targetUsername);
-                };
-            });
         });
-
-        function toggleWatchScreen(targetUsername) {
-            const existingVideo = document.querySelector(`video[data-username="${targetUsername}"]`);
-            if (existingVideo) {
-                existingVideo.remove();
-                const watchBtn = document.querySelector(`li[data-username="${targetUsername}"] .watch-btn`);
-                if (watchBtn) {
-                    watchBtn.innerText = 'İzle';
-                    watchBtn.classList.remove('watching-btn');
-                }
-            } else {
-                const stream = sharedStreams[targetUsername];
-                if (stream) {
-                    const video = document.createElement("video");
-                    video.srcObject = stream;
-                    video.autoplay = true;
-                    video.playsinline = true;
-                    video.muted = true;
-                    video.setAttribute('data-username', targetUsername);
-                    sharedScreenContainer.appendChild(video);
-
-                    const watchBtn = document.querySelector(`li[data-username="${targetUsername}"] .watch-btn`);
-                    if (watchBtn) {
-                        watchBtn.innerText = 'Durdur';
-                        watchBtn.classList.add('watching-btn');
-                    }
-                } else {
-                    alert("Ekran paylaşımı henüz başlamamış veya bir sorun oluştu.");
-                }
-            }
-        }
         
         toggleMicBtn.onclick = () => {
             if (localStream) {
@@ -439,46 +339,6 @@
                 localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
                 toggleMicBtn.innerText = isMicMuted ? 'Sesi Aç' : 'Sesi Kapat';
                 toggleMicBtn.classList.toggle('active');
-            }
-        };
-
-        shareScreenBtn.onclick = async () => {
-            if (isScreenSharing) {
-                if (screenStream) {
-                    screenStream.getTracks().forEach(track => track.stop());
-                }
-                isScreenSharing = false;
-                shareScreenBtn.innerText = "Ekran Paylaş";
-                shareScreenBtn.classList.remove("sharing");
-                socket.emit('stop-screen-share');
-                screenStream = null;
-            } else {
-                try {
-                    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                    isScreenSharing = true;
-                    shareScreenBtn.innerText = "Paylaşımı Durdur";
-                    shareScreenBtn.classList.add("sharing");
-                    socket.emit('start-screen-share');
-                    
-                    for (const peerId in peerConnections) {
-                        const peer = peerConnections[peerId];
-                        screenStream.getTracks().forEach(track => {
-                            const sender = peer.getSenders().find(s => s.track.kind === track.kind);
-                            if (sender) {
-                                sender.replaceTrack(track);
-                            } else {
-                                peer.addTrack(track, screenStream);
-                            }
-                        });
-                    }
-
-                    screenStream.getVideoTracks()[0].onended = () => {
-                        shareScreenBtn.click();
-                    };
-                } catch (e) {
-                    console.error("Ekran paylaşımı başlatılamadı:", e);
-                    alert("Ekran paylaşımı için izin vermeniz gerekiyor!");
-                }
             }
         };
         
@@ -489,7 +349,7 @@
             }
             try {
                 localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                localStream.getAudioTracks().forEach(track => track.enabled = false);
+                localStream.getAudioTracks().forEach(track => track.enabled = false); // Başlangıçta ses kapalı
                 isMicMuted = true;
                 toggleMicBtn.innerText = 'Sesi Aç';
                 toggleMicBtn.classList.remove('active');
@@ -508,22 +368,15 @@
         socket.on('call', async (data) => {
             if (!peerConnections[data.caller]) {
                 const newPeerConnection = new RTCPeerConnection(config);
-                newPeerConnection.remoteUsername = data.caller;
                 peerConnections[data.caller] = newPeerConnection;
-                
-                iceCandidateQueues[data.caller] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
                 
                 newPeerConnection.ontrack = e => {
-                    if (e.track.kind === 'audio') {
-                        const audio = document.createElement("audio");
-                        audio.srcObject = e.streams[0];
-                        audio.autoplay = true;
-                        document.body.appendChild(audio);
-                    } else if (e.track.kind === 'video') {
-                        sharedStreams[newPeerConnection.remoteUsername] = e.streams[0];
-                    }
+                    const audio = document.createElement("audio");
+                    audio.srcObject = e.streams[0];
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -541,22 +394,15 @@
         socket.on('offer', async (data) => {
             if (data.to === username && !peerConnections[data.from]) {
                 const newPeerConnection = new RTCPeerConnection(config);
-                newPeerConnection.remoteUsername = data.from;
                 peerConnections[data.from] = newPeerConnection;
-                
-                iceCandidateQueues[data.from] = [];
 
                 localStream.getTracks().forEach(track => newPeerConnection.addTrack(track, localStream));
 
                 newPeerConnection.ontrack = e => {
-                    if (e.track.kind === 'audio') {
-                        const audio = document.createElement("audio");
-                        audio.srcObject = e.streams[0];
-                        audio.autoplay = true;
-                        document.body.appendChild(audio);
-                    } else if (e.track.kind === 'video') {
-                         sharedStreams[newPeerConnection.remoteUsername] = e.streams[0];
-                    }
+                    const audio = document.createElement("audio");
+                    audio.srcObject = e.streams[0];
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
                 };
                 
                 newPeerConnection.onicecandidate = e => {
@@ -566,12 +412,6 @@
                 };
 
                 await newPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                
-                if (iceCandidateQueues[data.from]) {
-                    iceCandidateQueues[data.from].forEach(candidate => newPeerConnection.addIceCandidate(candidate));
-                    iceCandidateQueues[data.from] = null; 
-                }
-                
                 const answer = await newPeerConnection.createAnswer();
                 await newPeerConnection.setLocalDescription(answer);
                 socket.emit('answer', { to: data.from, answer: answer });
@@ -580,55 +420,25 @@
         
         socket.on('answer', async (data) => {
             if (data.to === username) {
-                const peer = peerConnections[data.from];
-                await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
-
-                if (iceCandidateQueues[data.from]) {
-                    iceCandidateQueues[data.from].forEach(candidate => peer.addIceCandidate(candidate));
-                    iceCandidateQueues[data.from] = null; 
-                }
+                await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.answer));
             }
         });
 
         socket.on('ice-candidate', async (data) => {
             if (data.to === username) {
-                const peer = peerConnections[data.from];
-                if (peer) {
-                    if (peer.remoteDescription) {
-                        try {
-                            await peer.addIceCandidate(data.candidate);
-                        } catch(e){
-                            console.error("ICE adayında hata:", e);
-                        }
-                    } else {
-                        iceCandidateQueues[data.from].push(data.candidate);
-                    }
-                } else {
-                    console.warn(`ICE adayı için hedef kullanıcı bulunamadı: ${data.from}`);
+                try {
+                    await peerConnections[data.from].addIceCandidate(data.candidate);
+                } catch(e){
+                    console.error("ICE adayında hata:", e);
                 }
             }
         });
 
         socket.on('disconnect-user', (disconnectedUser) => {
-            if (peerConnections[disconnectedUser]) {
-                 peerConnections[disconnectedUser].close();
-                 delete peerConnections[disconnectedUser];
-            }
-            delete sharedStreams[disconnectedUser];
-            if (iceCandidateQueues[disconnectedUser]) {
-                delete iceCandidateQueues[disconnectedUser];
-            }
+            delete peerConnections[disconnectedUser];
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
-            }
-            const videoElement = document.querySelector(`video[data-username="${disconnectedUser}"]`);
-            if (videoElement) {
-                videoElement.remove();
-            }
-            const userItemLeft = document.querySelector(`#otherUsersList li[data-username="${disconnectedUser}"]`);
-            if (userItemLeft) {
-                userItemLeft.remove();
             }
         });
 
