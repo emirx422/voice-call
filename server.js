@@ -18,8 +18,7 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
     console.log('Yeni bir kullanıcı bağlandı');
 
-    socket.on('set-username', (data) => {
-        const { username, color } = data;
+    socket.on('set-username', (username) => {
         if (!username) return;
         const existingUser = Object.values(users).find(user => user.username === username);
         if (existingUser) {
@@ -27,7 +26,7 @@ io.on('connection', (socket) => {
             return;
         }
 
-        users[socket.id] = { username, color, isSharing: false };
+        users[socket.id] = { username, isSharing: false };
         userSockets[username] = socket.id;
 
         io.emit('message', { username: 'Sistem', text: `${username} sohbete katıldı.`, timestamp: new Date().toLocaleTimeString(), isSystem: true });
@@ -37,14 +36,13 @@ io.on('connection', (socket) => {
     
     socket.on('message', (data) => {
         data.timestamp = new Date().toLocaleTimeString();
-        data.color = users[socket.id] ? users[socket.id].color : '#ffffff';
         io.emit('message', data);
     });
 
-    socket.on('voice-activity', (isSpeaking) => {
+    socket.on('voice-activity', (volume) => {
         const currentUser = users[socket.id];
         if (currentUser) {
-            socket.broadcast.emit('user-voice-activity', { username: currentUser.username, isSpeaking, color: currentUser.color });
+            socket.broadcast.emit('user-voice-activity', { username: currentUser.username, volume });
         }
     });
 
