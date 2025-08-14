@@ -145,6 +145,12 @@
             font-size: 0.9em;
             margin-bottom: 10px;
         }
+        
+        .message-timestamp {
+            color: #ccc;
+            font-size: 0.8em;
+            margin-right: 8px;
+        }
 
         .message-input-container {
             display: flex;
@@ -363,7 +369,7 @@
 
         socket.on('message', data => {
             const messageElement = document.createElement('div');
-            messageElement.innerText = `${data.username}: ${data.text}`;
+            messageElement.innerHTML = `<span class="message-timestamp">[${data.timestamp}]</span> <strong>${data.username}:</strong> ${data.text}`;
             messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
