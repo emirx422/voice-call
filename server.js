@@ -1,45 +1,49 @@
-const express = require("express");
+const express = require('express');
 const app = express();
-const http = require("http").createServer(app);
-const io = require("socket.io")(http);
-const path = require('path');
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 
-// Sunucunun dosyaları "public" klasöründen sunmasını sağlar.
-app.use(express.static(path.join(__dirname, 'public')));
+const users = {}; // Kullanıcıları saklamak için nesne
 
-let users = []; // Aktif kullanıcı listesi
+app.use(express.static(__dirname));
 
-io.on("connection", (socket) => {
-    console.log("Yeni bir kullanıcı bağlandı.");
+io.on('connection', socket => {
+    console.log('Yeni bir kullanıcı bağlandı: ' + socket.id);
 
-    // Yeni bağlanan kullanıcıya mevcut kullanıcı listesini gönderir
-    socket.emit('user-list-update', users);
-
-    // Kullanıcı adı alındığında listeye ekle ve herkese duyur
-    socket.on('set-username', (username) => {
-        socket.username = username;
-        if (!users.includes(username)) {
-            users.push(username);
-        }
-        io.emit('user-list-update', users);
-        console.log("Kullanıcı listesi güncellendi:", users);
+    // Kullanıcı adı ayarlandığında
+    socket.on('set-username', username => {
+        users[socket.id] = username;
+        io.emit('user-list-update', Object.values(users));
+        console.log(`Kullanıcı adı ayarlandı: ${username}`);
     });
 
-    // Bağlantı kesildiğinde kullanıcıyı listeden çıkar ve herkese duyur
+    // Mesaj geldiğinde
+    socket.on('message', data => {
+        io.emit('message', data);
+    });
+
+    // WebRTC sinyal işlemleri
+    socket.on('offer', offer => {
+        socket.broadcast.emit('offer', offer);
+    });
+
+    socket.on('answer', answer => {
+        socket.broadcast.emit('answer', answer);
+    });
+
+    socket.on('ice-candidate', candidate => {
+        socket.broadcast.emit('ice-candidate', candidate);
+    });
+
+    // Kullanıcı ayrıldığında
     socket.on('disconnect', () => {
-        console.log("Bir kullanıcı ayrıldı.");
-        if (socket.username) {
-            users = users.filter(user => user !== socket.username);
-            io.emit('user-list-update', users);
-            console.log("Kullanıcı listesi güncellendi:", users);
-        }
+        console.log('Bir kullanıcı ayrıldı: ' + socket.id);
+        delete users[socket.id];
+        io.emit('user-list-update', Object.values(users));
     });
-    
-    // Sesli arama ve mesajlaşma sinyal kodları
-    socket.on("offer", (data) => socket.broadcast.emit("offer", data));
-    socket.on("answer", (data) => socket.broadcast.emit("answer", data));
-    socket.on("ice-candidate", (data) => socket.broadcast.emit("ice-candidate", data));
-    socket.on('message', (data) => io.emit('message', data));
 });
 
-http.listen(process.env.PORT || 3000, () => console.log("Server çalışıyor..."));
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => {
+    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
+});
