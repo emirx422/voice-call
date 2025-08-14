@@ -81,11 +81,6 @@
             margin: 5px;
         }
 
-        #toggle-mic-btn.muted {
-            background-color: #d9534f;
-        }
-
-        /* Yeni: Sol Panel */
         #left-panel {
             position: fixed;
             left: 10px;
@@ -114,6 +109,9 @@
             display: flex;
             align-items: center;
             margin-bottom: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 8px;
+            border-radius: 5px;
         }
 
         .my-controls .user-name {
@@ -159,7 +157,6 @@
             cursor: pointer;
         }
 
-        /* Yeni: Sağ Üstteki Aktif Kullanıcı Listesi */
         #activeUsersList {
             position: fixed;
             right: 10px;
@@ -189,7 +186,7 @@
             justify-content: space-between;
             margin-bottom: 10px;
             padding: 8px;
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
         }
 
@@ -210,23 +207,24 @@
         .voice-bar {
             height: 100%;
             width: 0%;
-            background-color: limegreen;
+            background-color: deepskyblue; /* Mavi renk */
             transition: width 0.1s ease-out;
         }
-        
-        .mute-user-btn, #toggle-mic-btn {
+
+        /* Yeni: Mute/Unmute buton stilleri */
+        .mute-user-btn {
             border: none;
             padding: 6px 12px;
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
             color: white;
-            background-color: #d9534f;
+            background-color: #d9534f; /* Kırmızı, Muted */
             transition: background-color 0.2s ease;
         }
 
-        .mute-user-btn.active, #toggle-mic-btn.active {
-            background-color: #5cb85c;
+        .mute-user-btn.active {
+            background-color: #5cb85c; /* Yeşil, Unmuted */
         }
     </style>
 </head>
@@ -290,7 +288,7 @@
         const toggleMicBtn = document.getElementById('toggle-mic-btn');
         const callBtn = document.getElementById('callBtn');
         let username = '';
-        let isMicMuted = false;
+        let isMicMuted = true; // Başlangıçta ses kapalı
         
         // Ses akışı kısıtlamaları (gürültü engelleme açık)
         const audioConstraints = {
@@ -344,11 +342,9 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
         
-        // Aktif kullanıcı listesi güncellendiğinde
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
             otherUsersList.innerHTML = '';
-
             const myUsername = username;
             
             users.forEach(user => {
@@ -369,7 +365,6 @@
                 }
             });
 
-            // Mute düğmelerine listener ekleme
             document.querySelectorAll('.mute-user-btn').forEach(button => {
                 button.onclick = (e) => {
                     const targetUsername = e.target.closest('.user-item').getAttribute('data-username');
@@ -383,7 +378,6 @@
             });
         });
         
-        // Kendi mikrofonumuzu açma/kapama
         toggleMicBtn.onclick = () => {
             if (localStream) {
                 isMicMuted = !isMicMuted;
@@ -393,7 +387,6 @@
             }
         };
         
-        // Ses seviyesi göstergesi
         function setupVoiceIndicator(stream, username) {
             const analyser = audioContext.createAnalyser();
             const source = audioContext.createMediaStreamSource(stream);
@@ -412,7 +405,7 @@
 
                 let voiceBar;
                 if (username === localStream.username) {
-                    voiceBar = document.querySelector('.my-controls #my-voice-bar');
+                    voiceBar = document.querySelector('#my-voice-bar');
                 } else {
                     voiceBar = document.querySelector(`.user-item[data-username="${username}"] .voice-bar`);
                 }
@@ -432,9 +425,12 @@
             }
             try {
                 localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                localStream.username = username; // Stream'e kullanıcı adını ekle
-                
-                // Kendi ses kontrolümüzü göster
+                localStream.username = username;
+                localStream.getAudioTracks().forEach(track => track.enabled = false); // Başlangıçta ses kapalı
+                isMicMuted = true;
+                toggleMicBtn.innerText = 'Sesi Aç';
+                toggleMicBtn.classList.remove('active');
+
                 myUsernameSpan.innerText = username;
                 myControlsDiv.style.display = 'flex';
                 callBtn.style.display = 'none';
