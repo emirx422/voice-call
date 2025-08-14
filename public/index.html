@@ -120,6 +120,9 @@
         }
 
         #otherUsersList li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             padding: 8px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 5px;
@@ -188,7 +191,7 @@
             margin: 0;
         }
 
-        .mute-btn, #share-screen-btn {
+        .mute-btn, #share-screen-btn, .watch-btn {
             border: none;
             padding: 6px 12px;
             border-radius: 5px;
@@ -212,6 +215,14 @@
             background-color: #f0ad4e; /* Turuncu, Paylaşılıyor */
         }
 
+        .watch-btn {
+            background-color: #17a2b8; /* Mavi-turkuaz, İzle */
+        }
+
+        .watching-btn {
+            background-color: #f0ad4e; /* Turuncu, Durdur */
+        }
+        
         #shared-screen-container {
             position: fixed;
             bottom: 10px;
@@ -234,23 +245,25 @@
     <div id="fisbord">Fisbord</div>
 
     <div id="center-container">
-        <h1>Sesli Arama Babazırrolar İçin!</h1>
+        <h1>Sesli Arama babazırrolar için!</h1>
         
         <div id="username-container">
             <input type="text" id="username-input" placeholder="Kullanıcı adını gir">
             <button id="saveUsernameBtn" class="action-btn">Kaydet</button>
         </div>
 
-        <button id="callBtn" class="action-btn">Sesli Aramaya Katılmak için Tıkla</button>
+        <button id="callBtn" class="action-btn">Sesli aramak için tıkla</button>
     </div>
 
     <div id="left-panel">
         <div id="voice-control-panel">
-            <h3>Sesli Sohbetteki Kullanıcılar</h3>
+            <h3>Ses Kontrol Paneli</h3>
             <div class="user-item my-controls" style="display: none;">
                 <span class="user-name" id="my-username"></span>
-                <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
-                <button id="share-screen-btn">Ekran Paylaş</button>
+                <div style="display: flex; gap: 5px;">
+                    <button id="toggle-mic-btn" class="mute-btn">Sesi Aç</button>
+                    <button id="share-screen-btn">Ekran Paylaş</button>
+                </div>
             </div>
             <ul id="otherUsersList"></ul>
         </div>
@@ -278,6 +291,7 @@
         let localStream;
         let screenStream;
         const peerConnections = {};
+        const sharedStreams = {}; // Diğer kullanıcılardan gelen ekran akışlarını saklamak için
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
@@ -349,22 +363,71 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
         
+        // Sunucudan gelen kullanıcı ve ekran paylaşım durumu güncellemeleri
         socket.on('user-list-update', users => {
             userList.innerHTML = '';
             otherUsersList.innerHTML = '';
 
             users.forEach(user => {
                 const li = document.createElement('li');
-                li.innerText = user;
+                li.innerText = user.username;
                 userList.appendChild(li);
 
-                if (user !== username) {
+                if (user.username !== username) {
                     const liOther = document.createElement('li');
-                    liOther.innerText = user;
+                    liOther.innerText = user.username;
+                    liOther.setAttribute('data-username', user.username);
+                    
+                    // Ekran paylaşımı yapıyorsa "İzle" butonu ekle
+                    if (user.isSharing) {
+                         const watchBtn = document.createElement('button');
+                         watchBtn.className = 'watch-btn';
+                         watchBtn.innerText = 'İzle';
+                         liOther.appendChild(watchBtn);
+                    }
                     otherUsersList.appendChild(liOther);
                 }
             });
+            
+            // Dinamik olarak oluşturulan "İzle" butonlarına olay dinleyicisi ekle
+            document.querySelectorAll('.watch-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    const targetUsername = e.target.closest('li').getAttribute('data-username');
+                    toggleWatchScreen(targetUsername);
+                };
+            });
         });
+
+        function toggleWatchScreen(targetUsername) {
+            const existingVideo = document.querySelector(`video[data-username="${targetUsername}"]`);
+            if (existingVideo) {
+                // Zaten izleniyor, durdur
+                existingVideo.remove();
+                const watchBtn = document.querySelector(`li[data-username="${targetUsername}"] .watch-btn`);
+                if (watchBtn) {
+                    watchBtn.innerText = 'İzle';
+                    watchBtn.classList.remove('watching-btn');
+                }
+            } else {
+                // İzlemeye başla
+                const stream = sharedStreams[targetUsername];
+                if (stream) {
+                    const video = document.createElement("video");
+                    video.srcObject = stream;
+                    video.autoplay = true;
+                    video.playsinline = true;
+                    video.muted = true;
+                    video.setAttribute('data-username', targetUsername);
+                    sharedScreenContainer.appendChild(video);
+
+                    const watchBtn = document.querySelector(`li[data-username="${targetUsername}"] .watch-btn`);
+                    if (watchBtn) {
+                        watchBtn.innerText = 'Durdur';
+                        watchBtn.classList.add('watching-btn');
+                    }
+                }
+            }
+        }
         
         toggleMicBtn.onclick = () => {
             if (localStream) {
@@ -378,10 +441,16 @@
         shareScreenBtn.onclick = async () => {
             if (isScreenSharing) {
                 // Ekran paylaşımını durdur
-                screenStream.getTracks().forEach(track => track.stop());
+                if (screenStream) {
+                    screenStream.getTracks().forEach(track => {
+                        track.stop();
+                    });
+                }
                 isScreenSharing = false;
                 shareScreenBtn.innerText = "Ekran Paylaş";
                 shareScreenBtn.classList.remove("sharing");
+                socket.emit('stop-screen-share');
+                screenStream = null;
             } else {
                 // Ekran paylaşımını başlat
                 try {
@@ -389,20 +458,19 @@
                     isScreenSharing = true;
                     shareScreenBtn.innerText = "Paylaşımı Durdur";
                     shareScreenBtn.classList.add("sharing");
+                    socket.emit('start-screen-share');
                     
                     // Diğer kullanıcılara ekran akışını gönder
                     for (const peerId in peerConnections) {
                         const peer = peerConnections[peerId];
                         screenStream.getTracks().forEach(track => {
-                            peer.addTrack(track, screenStream);
+                             peer.addTrack(track, screenStream);
                         });
                     }
 
                     // Kullanıcı paylaşımı kapatırsa, otomatik olarak durdur
                     screenStream.getVideoTracks()[0].onended = () => {
-                        isScreenSharing = false;
-                        shareScreenBtn.innerText = "Ekran Paylaş";
-                        shareScreenBtn.classList.remove("sharing");
+                        shareScreenBtn.click(); // butona tıkla fonksiyonunu çağır
                     };
                 } catch (e) {
                     console.error("Ekran paylaşımı başlatılamadı:", e);
@@ -448,17 +516,8 @@
                         audio.autoplay = true;
                         document.body.appendChild(audio);
                     } else if (e.track.kind === 'video') {
-                        const video = document.createElement("video");
-                        video.srcObject = e.streams[0];
-                        video.autoplay = true;
-                        video.playsinline = true;
-                        video.muted = true;
-                        video.setAttribute('data-peer-id', data.caller);
-                        sharedScreenContainer.appendChild(video);
-                        
-                        e.track.onended = () => {
-                            video.remove();
-                        };
+                        // Ekran akışını doğrudan oynatma, sadece sakla
+                        sharedStreams[data.caller] = e.streams[0];
                     }
                 };
                 
@@ -488,17 +547,8 @@
                         audio.autoplay = true;
                         document.body.appendChild(audio);
                     } else if (e.track.kind === 'video') {
-                        const video = document.createElement("video");
-                        video.srcObject = e.streams[0];
-                        video.autoplay = true;
-                        video.playsinline = true;
-                        video.muted = true;
-                        video.setAttribute('data-peer-id', data.from);
-                        sharedScreenContainer.appendChild(video);
-                        
-                        e.track.onended = () => {
-                            video.remove();
-                        };
+                         // Ekran akışını doğrudan oynatma, sadece sakla
+                        sharedStreams[data.from] = e.streams[0];
                     }
                 };
                 
@@ -533,13 +583,18 @@
 
         socket.on('disconnect-user', (disconnectedUser) => {
             delete peerConnections[disconnectedUser];
+            delete sharedStreams[disconnectedUser];
             const userItemRight = document.querySelector(`#userList li`);
             if (userItemRight && userItemRight.innerText === disconnectedUser) {
                 userItemRight.remove();
             }
-            const videoElement = document.querySelector(`video[data-peer-id="${disconnectedUser}"]`);
+            const videoElement = document.querySelector(`video[data-username="${disconnectedUser}"]`);
             if (videoElement) {
                 videoElement.remove();
+            }
+            const userItemLeft = document.querySelector(`#otherUsersList li[data-username="${disconnectedUser}"]`);
+            if (userItemLeft) {
+                userItemLeft.remove();
             }
         });
 
