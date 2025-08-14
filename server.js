@@ -18,7 +18,8 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
     console.log('Yeni bir kullanıcı bağlandı');
 
-    socket.on('set-username', (username) => {
+    socket.on('set-username', (data) => {
+        const { username, color } = data;
         if (!username) return;
         const existingUser = Object.values(users).find(user => user.username === username);
         if (existingUser) {
@@ -26,17 +27,25 @@ io.on('connection', (socket) => {
             return;
         }
 
-        users[socket.id] = { username, isSharing: false };
+        users[socket.id] = { username, color, isSharing: false };
         userSockets[username] = socket.id;
 
+        io.emit('message', { username: 'Sistem', text: `${username} sohbete katıldı.`, timestamp: new Date().toLocaleTimeString(), isSystem: true });
         io.emit('user-list-update', Object.values(users));
         console.log(`Kullanıcı adı belirlendi: ${username}`);
     });
     
     socket.on('message', (data) => {
-        // Mesaja zaman damgası ekliyoruz
         data.timestamp = new Date().toLocaleTimeString();
+        data.color = users[socket.id] ? users[socket.id].color : '#ffffff';
         io.emit('message', data);
+    });
+
+    socket.on('voice-activity', (isSpeaking) => {
+        const currentUser = users[socket.id];
+        if (currentUser) {
+            socket.broadcast.emit('user-voice-activity', { username: currentUser.username, isSpeaking, color: currentUser.color });
+        }
     });
 
     socket.on('call', (data) => {
@@ -45,14 +54,7 @@ io.on('connection', (socket) => {
             io.emit('call', { caller: callerSocket.username });
         }
     });
-
-    socket.on('voice-activity', (isSpeaking) => {
-        const currentUser = users[socket.id];
-        if (currentUser) {
-            socket.broadcast.emit('user-voice-activity', { username: currentUser.username, isSpeaking });
-        }
-    });
-
+    
     socket.on('offer', (data) => {
         const toSocketId = userSockets[data.to];
         if (toSocketId) {
@@ -81,6 +83,7 @@ io.on('connection', (socket) => {
             delete users[socket.id];
             io.emit('disconnect-user', disconnectedUser);
             io.emit('user-list-update', Object.values(users));
+            io.emit('message', { username: 'Sistem', text: `${disconnectedUser} sohbetten ayrıldı.`, timestamp: new Date().toLocaleTimeString(), isSystem: true });
             console.log(`Kullanıcı ayrıldı: ${disconnectedUser}`);
         }
     });
