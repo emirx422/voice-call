@@ -123,7 +123,7 @@
         #otherUsersList li {
             padding: 8px;
             background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 5-px;
+            border-radius: 5px;
             margin-bottom: 8px;
             display: flex;
             flex-direction: column;
@@ -335,12 +335,34 @@
             update();
         }
 
+        async function initVoiceCall() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true } });
+                localStream.getAudioTracks().forEach(track => track.enabled = false);
+                isMicMuted = true;
+                toggleMicBtn.innerText = 'Mikrofonu Aç';
+                toggleMicBtn.classList.remove('active');
+                myUsernameSpan.innerText = username;
+                myControlsDiv.style.display = 'flex';
+                callBtn.style.display = 'none';
+                setupVoiceBar(localStream, myVoiceBar);
+            } catch (e) {
+                console.error("Mikrofon erişiminde hata:", e);
+                alert('Mikrofonunuza izin verin!');
+            }
+        }
+
         window.onload = () => {
             const savedUsername = localStorage.getItem('username');
-            if(savedUsername){
+            if (savedUsername) {
                 username = savedUsername;
-                socket.emit('set-username',username);
-                usernameContainer.style.display='none';
+                usernameContainer.style.display = 'none';
+                
+                // Kullanıcı adını sunucuya gönder ve otomatik aramayı başlat
+                initVoiceCall().then(() => {
+                    socket.emit('set-username', username);
+                    socket.emit('call', { caller: username });
+                });
             }
         };
 
@@ -371,10 +393,24 @@
         });
 
         socket.on('user-list-update', users=>{
-            userList.innerHTML=''; otherUsersList.innerHTML='';
+            userList.innerHTML=''; 
+            // otherUsersList.innerHTML=''; // Burayı kaldırdık, mevcut peer listesini koruyacağız
             users.forEach(user=>{
                 const li = document.createElement('li'); li.innerText = user; userList.appendChild(li);
-                if(user!==username) addRemoteUser(user);
+                if(user!==username) {
+                    addRemoteUser(user);
+                    if (!peerConnections[user]) { // Eğer bağlantı yoksa yeniden çağrı yap
+                         socket.emit('call', { caller: user });
+                    }
+                }
+            });
+            // Bağlantısı kopan kullanıcıları temizleme
+            Object.keys(peerConnections).forEach(peerUser => {
+                if (!users.includes(peerUser)) {
+                    delete peerConnections[peerUser];
+                    const li = document.getElementById('remote-' + peerUser);
+                    if (li) li.remove();
+                }
             });
         });
 
@@ -389,22 +425,12 @@
 
         callBtn.onclick = async () => {
             if(!username){ alert('Lütfen önce bir kullanıcı adı girin!'); return; }
-            try{
-                localStream = await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true}});
-                localStream.getAudioTracks().forEach(track=>track.enabled=false);
-                isMicMuted=true;
-                toggleMicBtn.innerText='Mikrofonu Aç';
-                toggleMicBtn.classList.remove('active');
-                myUsernameSpan.innerText=username;
-                myControlsDiv.style.display='flex';
-                callBtn.style.display='none';
-                setupVoiceBar(localStream,myVoiceBar);
-                socket.emit('call',{caller:username});
-            }catch(e){ console.error(e); alert('Mikrofonunuza izin verin!'); }
+            await initVoiceCall();
+            socket.emit('call', { caller: username });
         };
 
         socket.on('call', async data=>{
-            if(!peerConnections[data.caller]){
+            if(!peerConnections[data.caller] && localStream){
                 const pc = new RTCPeerConnection(config);
                 peerConnections[data.caller]=pc;
                 localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
@@ -422,7 +448,7 @@
         });
 
         socket.on('offer', async data=>{
-            if(data.to===username && !peerConnections[data.from]){
+            if(data.to===username && !peerConnections[data.from] && localStream){
                 const pc = new RTCPeerConnection(config);
                 peerConnections[data.from]=pc;
                 localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
